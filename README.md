@@ -2,7 +2,7 @@
 
 1. Open the 'terminal' application on your computer.
 
-2. Switch to wherever you want to use as your working directory:
+2. Change to wherever you want to use as your working directory:
 ```
 cd ~/Desktop
 ```
