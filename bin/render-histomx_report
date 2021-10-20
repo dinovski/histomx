@@ -1,0 +1,111 @@
+#!/bin/bash
+
+die()
+{
+    b=$(basename "$0")
+    echo "$b: error: $*" >&2
+    exit 1
+}
+
+#SOFT=$(basename $0)
+SOFT="render-histomx_report"
+
+function usage {
+    echo -e "usage: $SOFT -m histomx_report.Rmd -f new.RCC -r [RNA_FILE] -p [PATIENT_FILE] -i [REPORT_ID]"
+}
+
+function help {
+    usage;
+    echo
+    echo "OPTIONS"
+    echo
+    echo "   -m|--rmd R markdown file"
+    echo "   -f|--rcc INPUT: input RCC file"
+    echo "   [-r|--rna_file INPUT]: tab-delimited text file of RNA information"
+    echo "   [-p|--patient_file INPUT]: tab-delimited text file of patient information"
+    echo "   [-i|--id ID]: patient/report ID"
+    exit;
+}
+
+if [ $# -lt 2 ]
+then
+    help
+    exit
+fi
+
+## Transform long options to short
+for arg in "$@"; do
+  shift
+  case "$arg" in
+      "--rmd") set -- "$@" "-m" ;;
+      "--rcc") set -- "$@" "-f" ;;
+      "--rna_file") set -- "$@" "-r" ;;
+      "--patient_file")   set -- "$@" "-p" ;;
+      "--id")   set -- "$@" "-i" ;;
+      *)        set -- "$@" "$arg"
+  esac
+done
+
+while getopts "m:f:r:p:i:" OPT; do
+    case $OPT in
+    m) RMD_FILE=$OPTARG;;
+	f) RCC_FILE=$OPTARG;;
+	r) RNA_FILE=$OPTARG;;
+	p) PATIENT_FILE=$OPTARG;;
+	i) ID=$OPTARG;;
+	\?)
+	    echo "Invalid option: -$OPTARG" >&2
+	    usage
+	    exit 1
+	    ;;
+	:)
+	    echo "Option -$OPTARG requires an argument." >&2
+	    usage
+	    exit 1
+	    ;;
+    esac
+done
+
+#set -u
+
+echo "input samp id: ${ID}"
+#echo "rmd file ${RMD_FILE}"
+#echo "rcc file ${RCC_FILE}"
+
+test -n "$RMD_FILE" || die "missing RMD template filename"
+test -e "$RMD_FILE" || die "Rmarkdown template '$RMD_FILE' not found"
+test -n "$RCC_FILE" || die "missing RCC data file to process"
+test -e "$RCC_FILE" || die "file '$RCC_FILE' not found"
+
+if [[ -z $RMD_FILE || -z $RCC_FILE ]]; then
+    usage
+    exit
+fi
+
+expr "$RCC_FILE" : '^[-_a-zA-Z0-9/.]*$' > /dev/null \
+     || die "file name '$RCC_FILE' contains forbidden characters. Try using a symlink eg: ln -s path to/new/RCC ~/Desktop"
+
+if [[ -z "${ID}" ]]; then
+   ID=$(basename "${RCC_FILE}" .RCC)
+fi
+
+BASEDIR=$(dirname $RCC_FILE)
+OUTPUT="${BASEDIR}/${ID}_histomx.html"
+
+unset DISPLAY
+
+RSCRIPT="
+rmarkdown::render('$RMD_FILE',
+                    output_file='$OUTPUT',
+                    params=list(
+                    rcc_file='$RCC_FILE',
+                    rna_file='$RNA_FILE',
+                    patient_file='$PATIENT_FILE'))
+"
+
+echo "$RSCRIPT" | R --vanilla
+
+OUTPDF="${BASEDIR}/$(basename ${OUTPUT} .html).pdf"
+
+## convert html to pdf
+#wkhtmltopdf --javascript-delay 1 $OUTPUT $OUTPDF

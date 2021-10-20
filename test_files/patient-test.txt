@@ -1,0 +1,13 @@
+Patient name	Jean Deaux
+Date of transplantation	7/7/17
+Date of biopsy	1/1/18
+Donor type	living
+Donor age	
+Biopsy indication	
+Initial nephropathy	IgA Nephropathy
+Immunosuppressive therapy       	
+DSA	
+Histology	"Acute TCMR grade I (Banff: i2 t2 v1 g0, c1, ct1)"
+Creatininemia	
+Proteinuria/creatininuria ratio	
+BK viremia	
