@@ -23,8 +23,8 @@ cd ~/Desktop
 >
 > * Type the following command in order to clone this repository (ie. copy everything to your working directory):
 > ```
-> > git clone https://github.com/dinovski/histomx.git
-```
+> git clone https://github.com/dinovski/histomx.git
+> ```
 
 3. Set variables to define paths to scripts/files
 ```
