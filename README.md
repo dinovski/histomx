@@ -1,5 +1,8 @@
 **Generate HistoMx report for a single RCC file**
 
+You will need the following R packages:
+"DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "plyr", "pROC", "RUVSeq", "RCRnorm", "archetypes"
+
 1. Open the 'terminal' application on your computer.
 
 2. Change to wherever you want to use as your working directory:
