@@ -35,7 +35,7 @@ HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
 ```
 
-4. Download reference RCC files and move to the histomx 'refRCCs' directory:
+4. Download reference RCC files and move all the histomx 'refRCCs' directory:
 
 https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
 
