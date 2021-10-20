@@ -7,7 +7,11 @@
 cd ~/Desktop
 ```
 
-**OPTION 1 (with git version control):**
+**OPTION 1 (without git):**
+* Click the 'Code' button and then 'Download ZIP'
+* Unzip and copy this directory (histomx-main) to your working directory (eg. ~/Desktop)
+
+**OPTION 2 (with git version control):**
 * Install git by entering the following in the terminal window:
 ```
 brew install git
@@ -18,9 +22,6 @@ Other installation options:https://www.atlassian.com/fr/git/tutorials/install-gi
 ```
 git clone https://github.com/dinovski/histomx.git
 ```
-**OPTION2 (without git):**
-* Click the 'Code' button and then 'Download ZIP'
-* You can simply unzip and copy this directory (histomx-main) to you working directory (eg. ~/Desktop)
 
 3. Set variables to define paths to scripts/files
 ```
