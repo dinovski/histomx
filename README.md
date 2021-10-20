@@ -1,6 +1,6 @@
 **Generate HistoMx report for a single RCC file**
 
-You will need the following R packages:
+The following R packages must be installed:
 "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "plyr", "pROC", "RUVSeq", "RCRnorm", "archetypes"
 
 1. Open the 'terminal' application on your computer.
@@ -19,7 +19,7 @@ cd ~/Desktop
 ```
 brew install git
 ```
-Other installation options:https://www.atlassian.com/fr/git/tutorials/install-git
+Other installation options: https://www.atlassian.com/fr/git/tutorials/install-git
 
 * Type the following command in order to clone this repository (ie. copy everything to your working directory):
 ```
@@ -33,7 +33,7 @@ HISTOMX='~/Desktop/histomx/bin/render-histomx_report'
 RMD_FILE='~/Desktop/scripts/histomx_report.Rmd'
 ```
 
-4. Download reference RCC files and move to the histomx 'RCC' directory:
+4. Download reference RCC files and move to the histomx 'refRCCs' directory:
 
 https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
 
