@@ -8,7 +8,7 @@ cd ~/Desktop
 ```
 
 **OPTION 1 (without git):**
-* Click the 'Code' button and then 'Download ZIP'
+* Click the 'Code' button at the top of this repository and then 'Download ZIP'
 * Unzip and copy this directory (histomx-main) to your working directory (eg. ~/Desktop)
 
 **OPTION 2 (with git version control):**
@@ -31,7 +31,7 @@ RMD_FILE='~/Desktop/scripts/histomx_report.Rmd'
 ```
 
 4. Run histomx to generate the report
-* This will output an .html file (you can specify the name of the file with the '-i' parameter).
+* This will output an .html file (you can specify the name of the file with the '-i' argument).
 * The -m (or --rmd) and -f (or --rcc) arguments are required
 
 Running the HISTOMX command will show all possible input arguments:
