@@ -10,16 +10,16 @@ The following R packages must be installed:
 cd ~/Desktop
 ```
 
->**OPTION 1 (without git):**
->* Click the 'Code' button at the top of this repository and then 'Download ZIP'
->* Unzip and copy this directory (histomx-main) to your working directory (eg. ~/Desktop)
-
->**OPTION 2 (with git version control):**
->* Install git by entering the following in the terminal window:
-```
-brew install git
-```
->Other installation options: https://www.atlassian.com/fr/git/tutorials/install-git
+> **OPTION 1 (without git):**
+> * Click the 'Code' button at the top of this repository and then 'Download ZIP'
+> * Unzip and copy this directory (histomx-main) to your working directory (eg. ~/Desktop)
+>
+> **OPTION 2 (with git version control):**
+> * Install git by entering the following in the terminal window:
+> ```
+> brew install git
+> ```
+> Other installation options: https://www.atlassian.com/fr/git/tutorials/install-git
 
 * Type the following command in order to clone this repository (ie. copy everything to your working directory):
 ```
