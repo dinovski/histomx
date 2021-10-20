@@ -20,7 +20,7 @@ cd ~/Desktop
 brew install git
 ```
 Other installation options: https://www.atlassian.com/fr/git/tutorials/install-git
-------------------------------------------------
+--------------------------------------------------
 
 * Type the following command in order to clone this repository (ie. copy everything to your working directory):
 ```
