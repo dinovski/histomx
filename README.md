@@ -28,7 +28,8 @@ cd ~/Desktop
 
 3. Set variables to define paths to scripts/files
 ```
-HISTOMX_PATH=~/Desktop/histomx/. 
+HISTOMX_PATH=~/Desktop/histomx 
+
 HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report  
 
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
