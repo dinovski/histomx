@@ -31,9 +31,9 @@ RMD_FILE='~/Desktop/scripts/histomx_report.Rmd'
 ```
 
 4. Download reference RCC files and move to the histomx 'RCC' directory:
-```
+
 https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
-```
+
 
 5. Run histomx to generate the report
 * This will output an .html file (you can specify the name of the file with the '-i' argument).
