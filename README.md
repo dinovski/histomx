@@ -28,9 +28,9 @@ git clone https://github.com/dinovski/histomx.git
 
 3. Set variables to define paths to scripts/files
 ```
-HISTOMX_PATH='~/Desktop/histomx/'
-HISTOMX='~/Desktop/histomx/bin/render-histomx_report'
-RMD_FILE='~/Desktop/scripts/histomx_report.Rmd'
+HISTOMX_PATH=~/Desktop/histomx/
+HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report 
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
 ```
 
 4. Download reference RCC files and move to the histomx 'refRCCs' directory:
@@ -49,9 +49,9 @@ $HISTOMX
 
 The following are 2 examples (with and without patient or RNA QC files)
 ```
-$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/sample_files/test.RCC -i 'test-run'
+$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run'
 ```
 With optional patient and RNA sample files:
 ```
-$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/sample_files/test.RCC -i 'test-run' -p ${HISTOMX_PATH}/sample_files/test-patient.txt -r ${HISTOMX_PATH}/sample_files/test-rna.txt
+$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run' -p ${HISTOMX_PATH}/test_files/test-patient.txt -r ${HISTOMX_PATH}/test_files/test-rna.txt
 ```
