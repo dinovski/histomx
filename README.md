@@ -1,7 +1,7 @@
 **Generate HistoMx report for a single RCC file**
 
 The following R packages must be installed:
-"DESeq2", "dplyr", "ggplot2", "ggrepel", "gridExtra", "htmltools", "kableExtra", "knitr", "MASS", "plyr", "pROC", "rmarkdown", "RUVSeq", "RCRnorm", "archetypes"
+"archetypes", "DESeq2", "dplyr", "ggplot2", "ggrepel", "gridExtra", "htmltools", "kableExtra", "knitr", "MASS", "plyr", "pROC", "rmarkdown", "RUVSeq", "RCRnorm", "yaml"
 
 1. Open the 'terminal' application on your computer.
 
