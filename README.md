@@ -26,18 +26,20 @@ cd ~/Desktop
 > git clone https://github.com/dinovski/histomx.git
 > ```
 
-3. Create a directory called 'refRCCs', download reference RCC files.
+3. Create a directory called 'refRCCs'.
 ```
 mkdir -p $HISTOMX_PATH/refRCCs
 ```
+
+4. Download all reference RCC files.
 https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
 
-Move all files to this directory:
+5. Move all RCC files to this directory:
 ```
 mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
 ```
 
-4. Set variables to define paths to scripts/files
+6. Set variables to define paths to scripts/files
 ```
 HISTOMX_PATH=~/Desktop/histomx 
 
@@ -46,7 +48,7 @@ HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
 ```
 
-5. Run histomx to generate the report
+7. Run histomx to generate the report
 * This will output an .html file (you can specify the name of the file with the '-i' argument).
 * The -m (or --rmd) and -f (or --rcc) arguments are required
 
