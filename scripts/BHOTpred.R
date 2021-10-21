@@ -641,7 +641,9 @@ BHOTpred <- function(newRCC, outPath) {
   ## order by median scores (reorder not working)
   dat <- dat[,amr_order]
   colnames(dat) <- gsub("_score", "", colnames(dat))
+  suppressWarnings({
   dat.m <- data.table::melt(dat)
+  })
   dat.m$value <- dat.m$value * 100
   
   #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
@@ -669,7 +671,9 @@ BHOTpred <- function(newRCC, outPath) {
   ## order by median scores (reorder not working)
   dat <- dat[,tcmr_order]
   colnames(dat) <- gsub("_score", "", colnames(dat))
+  suppressWarnings({
   dat.m <- data.table::melt(dat)
+  })
   dat.m$value <- dat.m$value * 100
   
   #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
@@ -697,7 +701,9 @@ BHOTpred <- function(newRCC, outPath) {
   ## order by median scores (reorder not working)
   dat <- dat[,ati_order]
   colnames(dat) <- gsub("_score", "", colnames(dat))
+  suppressWarnings({
   dat.m <- data.table::melt(dat)
+  })
   dat.m$value <- dat.m$value * 100
   
   #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
@@ -725,7 +731,9 @@ BHOTpred <- function(newRCC, outPath) {
   ## order by median scores (reorder not working)
   dat <- dat[,normal_order]
   colnames(dat) <- gsub("_score", "", colnames(dat))
+  suppressWarnings({
   dat.m <- data.table::melt(dat)
+  })
   dat.m$value <- dat.m$value * 100
   
   #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
