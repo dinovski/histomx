@@ -107,5 +107,9 @@ echo "$RSCRIPT" | R --vanilla
 
 OUTPDF="${BASEDIR}/$(basename ${OUTPUT} .html).pdf"
 
-## convert html to pdf
-#wkhtmltopdf --javascript-delay 1 $OUTPUT $OUTPDF
+echo "DONE!"
+echo "To convert the html report to a paged pdf, use the following command:"
+echo "wkhtmltopdf --javascript-delay 1 $OUTPUT $OUTPDF"
+echo "To convert the html report to a pageless pdf, open in the file in a web browser and export as a PDF"
+
+
