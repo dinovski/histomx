@@ -53,7 +53,7 @@ https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sha
 mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
 ```
 
-8. Run histomx on test files to generate the report
+8. Run histomx on a single RCC file to generate the report
 * This will output an .html file (you can specify the name of the file with the '-i' argument).
 * The -m (or --rmd) and -f (or --rcc) arguments are required
 
