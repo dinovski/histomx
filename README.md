@@ -1,7 +1,7 @@
 **Generate HistoMx report for a single RCC file**
 
 The following R packages must be installed:
-"DESeq2", "dplyr", "ggplot2", "ggrepel", "gridExtra", "htmltools", "kableExtra", "knitr", "MASS", "plyr", "pROC", "RUVSeq", "RCRnorm", "archetypes"
+"DESeq2", "dplyr", "ggplot2", "ggrepel", "gridExtra", "htmltools", "kableExtra", "knitr", "MASS", "plyr", "pROC", "rmarkdown", "RUVSeq", "RCRnorm", "archetypes"
 
 1. Open the 'terminal' application on your computer.
 
@@ -26,7 +26,18 @@ cd ~/Desktop
 > git clone https://github.com/dinovski/histomx.git
 > ```
 
-3. Set variables to define paths to scripts/files
+3. Create a directory called 'refRCCs', download reference RCC files.
+```
+mkdir -p $HISTOMX_PATH/refRCCs
+```
+https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
+
+Move all files to this directory:
+```
+mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
+```
+
+4. Set variables to define paths to scripts/files
 ```
 HISTOMX_PATH=~/Desktop/histomx 
 
@@ -34,13 +45,6 @@ HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
 ```
-
-4. Create a directory called 'refRCCs', download reference RCC files, and move all to this directory:
-```
-mkdir -p $HISTOMX_PATH/refRCCs
-```
-https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
-
 
 5. Run histomx to generate the report
 * This will output an .html file (you can specify the name of the file with the '-i' argument).
