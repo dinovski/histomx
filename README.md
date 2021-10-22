@@ -1,4 +1,4 @@
-**Generate HistoMx report for a single RCC file**
+**Generate a HistoMx report for a single RCC file**
 
 R must be installed on your machine. You can dowload it here:  
 https://cran.r-project.org/bin/macosx/
@@ -10,7 +10,9 @@ https://cran.r-project.org/bin/macosx/
 cd ~/Desktop
 ```
 
-3. Install all R packages and dependencies. First, download the following file:  
+3. Install all R packages and dependencies.  
+
+First, download the following file:  
 https://drive.google.com/file/d/1V89z4OYOJxdMUtL54jKeg5CrP-SIR32q/view?usp=sharing
 
 Then run the following commands from the commandline in or in RStudio. This will only install missing packages and dependencies.  
