@@ -16,7 +16,7 @@ First, download the following file:
 https://drive.google.com/file/d/1V89z4OYOJxdMUtL54jKeg5CrP-SIR32q/view?usp=sharing
 
 Then run the following commands from the commandline in or in RStudio. This will only install missing packages and dependencies.  
-NOTE: some packages may need to be installed from Bioconductor: ```eg. BiocManager::install("DESeq2")```
+NOTE: some packages may need to be installed from Bioconductor: eg.```BiocManager::install("DESeq2")```
 ```
 R
 
