@@ -1,9 +1,9 @@
 **Generate HistoMx report for a single RCC file**
 
-__R must be installed on your machine__
+R must be installed on your machine. You can dowload it here:  
 https://cran.r-project.org/bin/macosx/
 
-1. Open the 'terminal' application on your computer.
+1. Open the 'Terminal' application on your computer.
 
 2. Change to wherever you want to use as your working directory:
 ```
@@ -14,7 +14,7 @@ cd ~/Desktop
 https://drive.google.com/file/d/1V89z4OYOJxdMUtL54jKeg5CrP-SIR32q/view?usp=sharing
 
 Then run the following commands from the commandline in or in RStudio. This will only install missing packages and dependencies.  
-
+NOTE: some packages may need to be installed from Bioconductor: ```eg. BiocManager::install("DESeq2")```
 ```
 R
 
