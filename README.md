@@ -82,7 +82,7 @@ All output files are written to the same directory as the input RCC file (in thi
 If you see an error with 'pandoc' you may need to update your version of RStudio. See here:  
 https://bookdown.org/yihui/rmarkdown-cookbook/install-pandoc.html
 
-> **To us git version control:**
+> **To use git version control:**
 > * Install git by entering the following in the terminal window:
 > ```
 > brew install git
