@@ -17,8 +17,7 @@ function usage {
 function help {
     usage;
     echo
-    echo "OPTIONS"
-    echo
+    echo "OPTIONS:"
     echo "   -m|--rmd R markdown file"
     echo "   -f|--rcc INPUT: input RCC file"
     echo "   [-r|--rna_file INPUT]: tab-delimited text file of RNA information"
