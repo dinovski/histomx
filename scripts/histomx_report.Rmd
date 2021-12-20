@@ -38,7 +38,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo=FALSE, include=TRUE}
-htmltools::img(src = knitr::image_uri(paste0(inPath, "/scripts/multi-logos.png")), 
+logoIMG='../static/multi-logos.png'
+
+htmltools::img(src = knitr::image_uri(logoIMG), 
                alt = 'logo', 
                style="display: block; margin-left: auto; margin-right: auto;")
 ```
