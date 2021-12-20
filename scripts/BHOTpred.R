@@ -7,22 +7,22 @@ source('../scripts/BHOT.R')
 ##-----------------------------------------------------
 modelPath='../models/'
 
-aa_model <- get(load(paste0(refPath, 'aa_model.rda')))
+aa_model <- get(load(paste0(modelPath, 'aa_model.rda')))
 
-normal.model <- get(load(paste0(refPath, 'normal_model.RData')))
-amr.model <- get(load(paste0(refPath, 'amr_model.RData')))
-tcmr.model <- get(load(paste0(refPath, 'tcmr_model.RData')))
-ati.model <- get(load(paste0(refPath, 'ati_model.RData')))
-ifta.model <- get(load(paste0(refPath, 'ifta_model.RData')))
-g0_score.model <- get(load(paste0(refPath, 'g0_score_model.RData')))
-ptc0_score.model <- get(load(paste0(refPath, 'ptc0_score_model.RData')))
-cg0_score.model <- get(load(paste0(refPath, 'cg0_score_model.RData')))
-v0_score.model <- get(load(paste0(refPath, 'v0_score_model.RData')))
-i1_score.model <- get(load(paste0(refPath, 'i1_score_model.RData')))
-t1_score.model <- get(load(paste0(refPath, 't1_score_model.RData')))
-ci1_score.model <- get(load(paste0(refPath, 'ci1_score_model.RData')))
-ct1_score.model <- get(load(paste0(refPath, 'ct1_score_model.RData')))
-cv1_score.model <- get(load(paste0(refPath, 'cv1_score_model.RData')))
+normal.model <- get(load(paste0(modelPath, 'normal_model.RData')))
+amr.model <- get(load(paste0(modelPath, 'amr_model.RData')))
+tcmr.model <- get(load(paste0(modelPath, 'tcmr_model.RData')))
+ati.model <- get(load(paste0(modelPath, 'ati_model.RData')))
+ifta.model <- get(load(paste0(modelPath, 'ifta_model.RData')))
+g0_score.model <- get(load(paste0(modelPath, 'g0_score_model.RData')))
+ptc0_score.model <- get(load(paste0(modelPath, 'ptc0_score_model.RData')))
+cg0_score.model <- get(load(paste0(modelPath, 'cg0_score_model.RData')))
+v0_score.model <- get(load(paste0(modelPath, 'v0_score_model.RData')))
+i1_score.model <- get(load(paste0(modelPath, 'i1_score_model.RData')))
+t1_score.model <- get(load(paste0(modelPath, 't1_score_model.RData')))
+ci1_score.model <- get(load(paste0(modelPath, 'ci1_score_model.RData')))
+ct1_score.model <- get(load(paste0(modelPath, 'ct1_score_model.RData')))
+cv1_score.model <- get(load(paste0(modelPath, 'cv1_score_model.RData')))
 
 ## import refSet molecular scores and Dx
 mscores_all_file <- '../static/refset_molecular_scores_all.txt'
