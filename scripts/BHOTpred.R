@@ -64,10 +64,7 @@ refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE
 ## manually exclude pediatric biospy RCCs for now
 pedRCC <- read.table('../static/ped_rcc_ids.txt', header=FALSE)
 
-refRCC <- refRCC[!basename(refRCC) %in% pedRCC]
-
-## for testing
-#newRCC="../test_files/test.RCC" 
+refRCC <- refRCC[!basename(refRCC) %in% pedRCC[,1]]
 
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
