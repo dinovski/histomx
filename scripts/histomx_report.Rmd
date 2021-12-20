@@ -22,7 +22,6 @@ system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop
 ```
 
 ```{r setup, include=FALSE, echo=FALSE}
-
 ## set paths in all code chunks are relative to this root.dir
 rdir=getwd()
 knitr::opts_knit$set(rdir)
@@ -39,9 +38,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo=FALSE, include=TRUE}
-logoIMG='../static/multi-logos.png'
-
-htmltools::img(src = knitr::image_uri(logoIMG), 
+htmltools::img(src = knitr::image_uri(paste0(inPath, "/scripts/multi-logos.png")), 
                alt = 'logo', 
                style="display: block; margin-left: auto; margin-right: auto;")
 ```
@@ -76,7 +73,6 @@ outPath=paste0(newPath, '/histomx_results/')
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
-
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
 ## and return a list of these files
 newPreds <- BHOTpred(newRCC, outPath)
@@ -202,10 +198,10 @@ Diagnosis based scores represent the probability that a biopsy has an expression
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## table of molecular scores
-ms_new <- data.frame(t(newPreds$score_table[,c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "cv0_score", "ci0_score", "ct0_score")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "cv1_score", "ci1_score", "ct1_score")]))
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "cv0_score", "ci0_score", "ct0_score", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -295,6 +291,29 @@ kable(newPreds$knn, row.names=FALSE, align='c', caption="", format="html") %>%
 </div>
 
 ***
+### Pathway analysis
+```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
+pw_df <- newPreds$pathways
+pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
+
+kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
+          row_spec(1:nrow(pw_df), background="white") %>%
+          column_spec(c(1,3), bold=TRUE, background="whitesmoke")
+```
+Counts reflect the number of genes with more than 2x expression (fold change) in the tested biopsy compared to the mean of all non-rejection biopsies associated with the listed pathway.
+
+### Cell-type analysis
+```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
+ct_df <- newPreds$cell_types
+ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
+
+kable(ct_df, row.names=FALSE, col.names=rep("", ncol(ct_df)), align='c', format="html") %>%
+          row_spec(1:nrow(ct_df), background="white") %>%
+          column_spec(c(1,3), bold=TRUE, background="whitesmoke")
+```
+Counts reflect the number of genes with more than 2x expression (fold change) in the tested biopsy compared to the mean of all non-rejection biopsies associated with the listed cell type.
+
+***
 ### Clinician signout
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
 kable(data.frame(Name=">", Signature=""), align='c', format="html") %>% kableExtra::kable_styling(position="center") %>%
@@ -312,10 +331,6 @@ kable(data.frame(Name=">", Signature=""), align='c', format="html") %>% kableExt
 
 ### RNA quality
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
-## dummy table for now
-#rna_df <- data.frame(ID=newPreds$score_table$ID, concentration=15)
-#rna_df$'260/280 ratio' <- 2.1
-#rna_df$'260/230 ratio' <- 2.0
 
 if(!is.na(file.info(newRNA)$size)) {
   

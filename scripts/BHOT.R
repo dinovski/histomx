@@ -1,6 +1,6 @@
 
 ## Load dependencies
-library_list <- c("DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "archetypes")
+library_list <- c("DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "archetypes")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
@@ -798,4 +798,20 @@ rccQC <- function(RCCfile, outPath) {
     
 }
 
+##------------------
+## Differential expression analysis for comparisons of interest
 
+runDESeq <- function(raw_counts, col_data, exp_design) {
+    
+    deseq.res <- DESeqDataSetFromMatrix(countData = raw_counts, 
+                                        colData = col_data, 
+                                        design = formula(exp_design))
+    deseq.res <- DESeq(deseq.res, test="Wald")
+    deseq.res.sig <- results(deseq.res, pAdjustMethod="bonferroni", tidy=TRUE)
+    deseq.res.sig <- deseq.res.sig[order(deseq.res.sig$pvalue, decreasing=FALSE),]
+    rownames(deseq.res.sig) <- deseq.res.sig$row
+    hist(deseq.res.sig$pvalue, main="")
+    
+    return(deseq.res.sig)
+    
+}
