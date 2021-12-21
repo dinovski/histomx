@@ -431,7 +431,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     colnames(new.t1.pred) <- c("t1_score", "ID")
   
     ##--------------------------
-    ## predict prob ci>0 for new sample(s)
+    ## predict prob ci>1 for new sample(s)
     #ci1.genes <- rownames(ci1_score.model$scaling) #LDA
     ci1.genes <- names(ci1_score.model$coefficients)[-1] #LR 
   
@@ -449,7 +449,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     colnames(new.ci1.pred) <- c("ci1_score", "ID")
   
     ##--------------------------
-    ## predict1 prob ct1>0 for new sample(s)
+    ## predict prob ct>1 for new sample(s)
     #ct1.genes <- rownames(ct1_score.model$scaling) #LDA
     ct1.genes <- names(ct1_score.model$coefficients)[-1] #LR 
   
@@ -467,7 +467,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     colnames(new.ct1.pred) <- c("ct1_score", "ID")
   
     ##--------------------------
-    ## predicv1 prob cv1>0 for new sample(s)
+    ## predict prob cv>1 for new sample(s)
     #cv1.genes <- rownames(cv1_score.model$scaling) #LDA
     cv1.genes <- names(cv1_score.model$coefficients)[-1] #LR 
   
@@ -673,8 +673,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     #ref.scores <- rbind(ref.amr.median, ref.tcmr.median, ref.normal.median)
     #ref.scores <- data.frame(apply(ref.scores, 1, function(x) {round(x, 3)*100}))
     #colnames(ref.scores) <- gsub("ref.", "", colnames(ref.scores))
-      #ref.scores$score <- rownames(ref.scores)
-  ##write.table(ref.scores, file=paste0(newOut, "/refset_median_scores_", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
+    #ref.scores$score <- rownames(ref.scores)
+    ##write.table(ref.scores, file=paste0(newOut, "/refset_median_scores_", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
   
     ##----------------------------------------------
     ## boxplots of reference biopsy molecular scores
@@ -968,7 +968,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               axis.title.x=element_text(face="bold", size=12, angle=0), 
               axis.title.y=element_text(face="bold", size=12),  
               panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-  
     #if (saveFiles=="TRUE") {
     #  ggsave(paste0(newOut, "/pca_archetypes_pc1_2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_aa, device="pdf", width=7, height=6)
     #}
@@ -989,8 +988,10 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               axis.title.x=element_text(face="bold", size=12, angle=0), 
               axis.title.y=element_text(face="bold", size=12),  
               panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #ggsave(paste0(newOut, "/pca_archetypes_pc2_3_", newID, "_", Sys.Date(), ".pdf"), plot=last_plot(), device="pdf", width=7, height=6)
-  
+    #if (saveFiles=="TRUE") {
+      #ggsave(paste0(newOut, "/pca_archetypes_pc2_3_", newID, "_", Sys.Date(), ".pdf"), plot=last_plot(), device="pdf", width=7, height=6)
+    #}
+    
     ##---------------
     ## Dx by cluster
     ## banff score by cluster
