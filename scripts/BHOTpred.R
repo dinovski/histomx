@@ -184,69 +184,84 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     #new_top_fc <- new_norm_ref_counts[new_norm_ref_counts$FC_normal>2,]
     new_top_fc <- new_norm_ref_counts[new_norm_ref_counts$FC_no_rejection>2,]
     
-    ##------------
+    ##----------------------
     ## get pathway and cell type for each gene of interest
-    new_top_fc$pathways <- NA
-    new_top_fc$cell_types <- NA
-  
-    positive_pathways <- NULL
-    positive_cell_types <- NULL
-  
-    for (i in 1:nrow(new_top_fc)) {
-    
-      gene=new_top_fc$gene[i] #gene="GNLY"
-      annot <- bhot_annot[bhot_annot$Gene==gene,]
-      ct <- bhot_annot[bhot_annot$Gene==gene,"Cell Type"] 
-    
-      p_pathways <- colnames(annot[which(annot=="+")])
-      p_cell_types <- ct[ct %in% bhot_cell_types]
-    
-      ## add positive pathways/cell types to gene table
-      new_top_fc[i,"pathways"] <- paste(p_pathways, collapse="|")
-      new_top_fc[i,"cell_types"] <- paste(p_cell_types, collapse="|")
-    
-      ## output all pathway and cell type matches
-      positive_pathways <- append(positive_pathways, p_pathways)
-      positive_cell_types <- append(positive_cell_types, p_cell_types)
-    
-    }
-  
-    ## pathways summary
-    if (length(positive_pathways) > 0) {
+    ## input = new_top_fc
+    ## output = pathway_table and cell_type_table
+    if (nrow(new_top_fc) == 0) {
       
-        positive_pathways <- data.frame(table(positive_pathways))
-        colnames(positive_pathways) <- c("Pathway", "Count")
-      
-        negative_pathways <- bhot_pathways[!bhot_pathways %in% positive_pathways$Pathway]
-        negative_pathways <- data.frame(Pathway=negative_pathways, Count=0)
-      
-        pathway_table <- rbind(positive_pathways, negative_pathways)
-        pathway_table <- pathway_table[order(pathway_table$Count, decreasing=TRUE),]
+      ## if no genes with FC>2 output table with 0 counts
+      pathway_table <- data.frame('Pathway'=bhot_pathways, Count=0, check.names=FALSE)
+      cell_type_table <- data.frame('Cell type'=bhot_cell_types, Count=0, check.names=FALSE)
       
     } else {
       
-        pathway_table <- data.frame(Pathway=bhot_pathways, Count=0)
+        new_top_fc$pathways <- NA
+        new_top_fc$cell_types <- NA
+      
+        positive_pathways <- NULL
+        positive_cell_types <- NULL
+      
+        for (i in 1:nrow(new_top_fc)) {
+        
+          gene=new_top_fc$gene[i] #gene="GNLY"
+          annot <- bhot_annot[bhot_annot$Gene==gene,]
+          ct <- bhot_annot[bhot_annot$Gene==gene,"Cell Type"] 
+        
+          p_pathways <- colnames(annot[which(annot=="+")])
+          p_cell_types <- ct[ct %in% bhot_cell_types]
+        
+          ## add positive pathways/cell types to gene table
+          new_top_fc[i,"pathways"] <- paste(p_pathways, collapse="|")
+          new_top_fc[i,"cell_types"] <- paste(p_cell_types, collapse="|")
+        
+          ## output all pathway and cell type matches
+          positive_pathways <- append(positive_pathways, p_pathways)
+          positive_cell_types <- append(positive_cell_types, p_cell_types)
+        
+        }
+      
+        ##----
+        ## pathways summary
+        if (length(positive_pathways) > 0) {
+        
+          positive_pathways <- data.frame(table(positive_pathways))
+          colnames(positive_pathways) <- c("Pathway", "Count")
+          
+          ## if all pathways represented output counts
+          if (length(unique(positive_pathways$Pathway)) == length(bhot_pathways)) {
+              pathway_table <- positive_pathways
+          } else { #output 0
+              negative_pathways <- bhot_pathways[!bhot_pathways %in% positive_pathways$Pathway]
+              negative_pathways <- data.frame(Pathway=negative_pathways, Count=0)
+              pathway_table <- rbind(positive_pathways, negative_pathways)
+          }
+          pathway_table <- pathway_table[order(pathway_table$Count, decreasing=TRUE),]
+        
+        } else {
+          pathway_table <- data.frame(Pathway=bhot_pathways, Count=0)
+        }
+      
+        ## cell types summary
+        if (length(positive_cell_types) > 0) {
+        
+          positive_cell_types <- data.frame(table(positive_cell_types))
+          colnames(positive_cell_types) <- c("Cell type", "Count")
+        
+          negative_cell_types <- bhot_cell_types[!bhot_cell_types %in% positive_cell_types$'Cell_type']
+          negative_cell_types <- data.frame('Cell type'=negative_cell_types, Count=0, check.names=FALSE)
+        
+          cell_type_table <- rbind(positive_cell_types, negative_cell_types)
+          cell_type_table <- cell_type_table[order(cell_type_table$Count, decreasing=TRUE),]
+        
+        } else {
+        
+          cell_type_table <- data.frame('Cell type'=bhot_cell_types, Count=0, check.names=FALSE)
+        
+        }
       
     }
-  
-    ## cell types summary
-    if (length(positive_cell_types) > 0) {
-      
-        positive_cell_types <- data.frame(table(positive_cell_types))
-        colnames(positive_cell_types) <- c("Cell type", "Count")
-      
-        negative_cell_types <- bhot_cell_types[!bhot_cell_types %in% positive_cell_types$'Cell_type']
-        negative_cell_types <- data.frame('Cell type'=negative_cell_types, Count=0, check.names=FALSE)
-      
-        cell_type_table <- rbind(positive_cell_types, negative_cell_types)
-        cell_type_table <- cell_type_table[order(cell_type_table$Count, decreasing=TRUE),]
-      
-    } else {
-      
-        cell_type_table <- data.frame('Cell type'=bhot_cell_types, Count=0, check.names=FALSE)
-      
-    }
-  
+    
     ##--------------------------
     ## predict Dx/Banff score probabilities
     ##--------------------------
