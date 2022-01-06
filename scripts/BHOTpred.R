@@ -47,6 +47,12 @@ dx_no_rejection <- unique(mscores_ref$Dx)[!unique(mscores_ref$Dx) %in% c(dx_amr,
 ## import BHOT gene annotations
 ##-----------------------------------------------------
 bhot_annot <- read.csv('../static/BHOT_annotations_il6.csv', check.names=FALSE, header=TRUE)
+## exclude control and viral genes (n=12+4)
+rm_genes <- bhot_annot[bhot_annot$`Internal Reference Gene`=="+" | bhot_annot$`Viral Detection`=="+","Gene"]
+bhot_annot <- bhot_annot[!bhot_annot$Gene %in% rm_genes,]
+
+endats <- read.table('../static/ENDAT_genes.txt', check.names=FALSE, header=FALSE)
+endats <- endats[endats$V1 %in% bhot_annot$Gene,]
 
 bhot_cell_types <- c("B-cells", "Macrophages", "T-cells", "NK cells")
 
@@ -55,6 +61,16 @@ bhot_pathways <- c("B-cell Receptor Signaling", "Chemokine Signaling", "Compleme
                    "Type I Interferon Signaling", "Type II Interferon Signaling")
 
 bhot_annot <- bhot_annot[,colnames(bhot_annot) %in% c("Gene", "Cell Type", bhot_pathways)]
+
+## table of total genes per category (for enrichment analysis)
+bhot_pathway_totals <- data.frame(Pathway=apply(bhot_annot[,bhot_pathways], 2, function(x) {sum(x=="+")} ))
+colnames(bhot_pathway_totals) <- c("Total")
+bhot_pathway_totals$Pathway <- rownames(bhot_pathway_totals)
+
+bhot_cell_type_totals <- data.frame(table(bhot_annot[bhot_annot$`Cell Type` %in% bhot_cell_types,"Cell Type"]))
+colnames(bhot_cell_type_totals) <- c("CellType", "Total")
+bhot_cell_type_totals <- rbind(bhot_cell_type_totals,
+                               data.frame(CellType="Endothelial", Total=length(endats), check.names=F))
 
 ##-------------
 ## reference set RCC files (for data normalization)
@@ -104,7 +120,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
   
     ## rename newID if also exists in refset sample names: rownames(mscores_ref)
     samp_ind <- grep(newID, rownames(mscores_ref))
-    if (length(samp_ind) > 1) {
+    if (isTRUE(length(samp_ind) > 1)) {
       newID <- gsub("histomx-new", colnames(countTable)[samp_ind[2]])
     }
   
@@ -114,7 +130,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     if (newRLF != "NS_Hs_Transplant_v1.0") {
       stop("The Gene RLF must be the same as the reference set: nCounter Human Organ Transplant Panel (NS_Hs_Transplant_v1.0)")
     } else {
-      cat(">>Outputting results for sample", newID, "\n")
+      cat(">>Outputting results for sample:", newID, "\n")
     }
   
     ## create sample directory in outPath
@@ -156,55 +172,52 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     ## signaling pathways
     ##--------------------------
     norm_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_normal,])
-    no_rej_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_no_rejection,])
+    #norm_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_no_rejection,])
   
     new_counts <- ns.norm[,colnames(ns.norm) %in% newID]
     new_counts <- data.frame(gene=rownames(ns.norm),
                             new_counts=ns.norm[,colnames(ns.norm) %in% newID])
+    new_counts <- new_counts[new_counts$new_counts!=0,]
   
-    ## calculate mean expression in refset normal biopsies
-    normal_counts <- ns.norm[,colnames(ns.norm) %in% norm_bx_ids]
-    normal_counts <- data.frame(normal_counts=apply(normal_counts, 1, mean))
-    normal_counts$gene <- rownames(normal_counts)
-  
-    new_norm_counts <- merge(new_counts, normal_counts, by="gene")
-    new_norm_counts$FC_normal <- new_norm_counts$new_counts / new_norm_counts$normal_counts
-    new_norm_counts <- new_norm_counts[order(new_norm_counts$FC_normal, decreasing=TRUE),]
-  
-    ## calculate mean expression in non-rejection refset biopsies
-    ref_counts <- ns.norm[,colnames(ns.norm) %in% no_rej_bx_ids]
-    ref_counts <- data.frame(no_rejection_counts=apply(ref_counts, 1, mean))
+    ## calculate mean|median expression in refset normal biopsies
+    ref_counts <- ns.norm[,colnames(ns.norm) %in% norm_bx_ids]
+    ref_counts <- data.frame(ref_median=apply(ref_counts, 1, median),
+                                ref_sd=apply(ref_counts, 1, sd))
     ref_counts$gene <- rownames(ref_counts)
   
-    new_norm_ref_counts <- merge(new_norm_counts, ref_counts, by="gene")
-    new_norm_ref_counts$FC_no_rejection <- new_norm_ref_counts$new_counts / new_norm_ref_counts$normal_counts
-    new_norm_ref_counts <- new_norm_ref_counts[order(new_norm_ref_counts$FC_no_rejection, decreasing=TRUE),]
+    new_norm_counts <- merge(new_counts, ref_counts, by="gene")
+    new_norm_counts$FC <- new_norm_counts$new_counts / new_norm_counts$ref_median
+    new_norm_counts <- new_norm_counts[order(new_norm_counts$FC, decreasing=TRUE),]
   
-    ## compare to normal or no rejection
-    #new_top_fc <- new_norm_ref_counts[new_norm_ref_counts$FC_normal>2,]
-    new_top_fc <- new_norm_ref_counts[new_norm_ref_counts$FC_no_rejection>2,]
+    #new counts > ref_median +/- n*SD(normal counts)
+    new_norm_counts$upper <- new_norm_counts$ref_median + 2*new_norm_counts$ref_sd
+    new_norm_counts$lower <- new_norm_counts$ref_median - 2*new_norm_counts$ref_sd
+    
+    ## apply FC or SD cutoff
+    #new_top_genes <- new_norm_counts[new_norm_counts$FC>1.5,]
+    new_top_genes <- new_norm_counts[new_norm_counts$new_counts>new_norm_counts$upper | new_norm_counts$new_counts<new_norm_counts$lower,]
     
     ##----------------------
     ## get pathway and cell type for each gene of interest
     ## input = new_top_fc
     ## output = pathway_table and cell_type_table
-    if (nrow(new_top_fc) == 0) {
+    if (nrow(new_top_genes) == 0) {
       
-      ## if no genes with FC>2 output table with 0 counts
+      ## if no genes of interest output table with 0 counts
       pathway_table <- data.frame('Pathway'=bhot_pathways, Count=0, check.names=FALSE)
-      cell_type_table <- data.frame('Cell type'=bhot_cell_types, Count=0, check.names=FALSE)
+      cell_type_table <- data.frame(CellType=bhot_cell_types, Count=0, check.names=FALSE)
       
     } else {
       
-        new_top_fc$pathways <- NA
-        new_top_fc$cell_types <- NA
+        new_top_genes$pathways <- NA
+        new_top_genes$cell_types <- NA
       
         positive_pathways <- NULL
         positive_cell_types <- NULL
       
-        for (i in 1:nrow(new_top_fc)) {
+        for (i in 1:nrow(new_top_genes)) {
         
-          gene=new_top_fc$gene[i] #gene="GNLY"
+          gene=new_top_genes$gene[i]
           annot <- bhot_annot[bhot_annot$Gene==gene,]
           ct <- bhot_annot[bhot_annot$Gene==gene,"Cell Type"] 
         
@@ -212,8 +225,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
           p_cell_types <- ct[ct %in% bhot_cell_types]
         
           ## add positive pathways/cell types to gene table
-          new_top_fc[i,"pathways"] <- paste(p_pathways, collapse="|")
-          new_top_fc[i,"cell_types"] <- paste(p_cell_types, collapse="|")
+          new_top_genes[i,"pathways"] <- paste(p_pathways, collapse="|")
+          new_top_genes[i,"cell_types"] <- paste(p_cell_types, collapse="|")
         
           ## output all pathway and cell type matches
           positive_pathways <- append(positive_pathways, p_pathways)
@@ -245,22 +258,94 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
         ## cell types summary
         if (length(positive_cell_types) > 0) {
         
-          positive_cell_types <- data.frame(table(positive_cell_types))
-          colnames(positive_cell_types) <- c("Cell type", "Count")
+          pos_ct_df <- data.frame(table(positive_cell_types))
+          colnames(pos_ct_df) <- c("CellType", "Count")
         
-          negative_cell_types <- bhot_cell_types[!bhot_cell_types %in% positive_cell_types$'Cell_type']
-          negative_cell_types <- data.frame('Cell type'=negative_cell_types, Count=0, check.names=FALSE)
+          negative_cell_types <- bhot_cell_types[!bhot_cell_types %in% pos_ct_df$CellType]
+          neg_ct_df <- data.frame(CellType=negative_cell_types, Count=0, check.names=FALSE)
+          
+          ## Add total endothelial associated gene count
+          num_endats <- data.frame(CellType='Endothelial', Count=sum(ifelse(new_top_genes$gene %in% endats, 1, 0)), check.names=FALSE)
         
-          cell_type_table <- rbind(positive_cell_types, negative_cell_types)
+          cell_type_table <- rbind(pos_ct_df, neg_ct_df, num_endats)
           cell_type_table <- cell_type_table[order(cell_type_table$Count, decreasing=TRUE),]
-        
+          
         } else {
         
-          cell_type_table <- data.frame('Cell type'=bhot_cell_types, Count=0, check.names=FALSE)
-        
+          cell_type_table <- data.frame(CellType=c(bhot_cell_types, "Endothelial"), Count=0, check.names=FALSE)
         }
       
     }
+    
+    ## test whether the pathway/cell type of interest contains more sig genes
+    ## compared to those outside the pathway than expected by chance
+    pathway_table <- merge(pathway_table, bhot_pathway_totals, by="Pathway")
+    cell_type_table <- merge(cell_type_table, bhot_cell_type_totals, by="CellType")
+    
+    ## ratio of enriched genes per category
+    pathway_table$GeneRatio <- round(pathway_table$Count/pathway_table$Total, 3)
+    cell_type_table$GeneRatio <- round(cell_type_table$Count/cell_type_table$Total, 3)
+      
+    ## Test for enrichment
+    # my.counts<-matrix(c(pathway_table$Count[i],
+    #                     pathway_table$Total[i] - pathway_table$Count[i],
+    #                     nrow(new_top_genes)-pathway_table$Count[i],
+    #                     nrow(bhot_annot)-pathway_table$Total[i]-nrow(new_top_genes)+pathway_table$Count[i]), 2, 2)
+    # fisher.test(my.counts, alternative='greater')$p.value
+    
+    ## hypergeometric test (same as 1-sided fisher's exact)
+    ## x-1 when lower.tail=F: interpretation of the p-value is P[X > x]
+   
+    ## pathways
+    pathway_table$pval <- phyper(q=pathway_table$Count - 1,
+                                 m=pathway_table$Total,
+                                 n=nrow(bhot_annot)-pathway_table$Total,
+                                 k=nrow(new_top_genes), lower.tail=FALSE)
+    pathway_table <- pathway_table[order(pathway_table$pval, decreasing=F),]
+    pathway_table$qval<-1.0
+    ## adjust p value for pathways with count>0
+    pathway_table[pathway_table$Count!=0,"qval"] <- round(p.adjust(pathway_table[pathway_table$Count!=0,"pval"], method="BH"), 3)
+    
+    ## cell types
+    cell_type_table$pval <- phyper(q=cell_type_table$Count - 1,
+                                 m=cell_type_table$Total,
+                                 n=nrow(bhot_annot)-cell_type_table$Total,
+                                 k=nrow(new_top_genes), lower.tail=FALSE)
+    cell_type_table <- cell_type_table[order(cell_type_table$pval, decreasing=F),]
+    cell_type_table$qval<-1.0
+    ## adjust p value for cell types with count>0
+    cell_type_table[cell_type_table$Count!=0,]$qval <- round(p.adjust(cell_type_table[cell_type_table$Count!=0,"pval"], method="BH"), 3)
+    
+    ##-----------------
+    ## enrichment plots
+    pathway_table$GeneRatio[pathway_table$GeneRatio==0]<-0.001 ## add small value to display non-enriched pathways
+    pathway_table$Pathway <- factor(pathway_table$Pathway, levels=pathway_table$Pathway[order(pathway_table$GeneRatio)])
+    
+    pathway_plot <- ggplot(pathway_table, aes(x=Pathway, y=GeneRatio, fill=qval)) +
+      geom_bar(stat = "identity") + xlab("") + coord_flip() + 
+      scale_colour_gradient2(limits = c(0, 1)) +
+      theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
+            panel.background=element_blank(), axis.line=element_line(colour="black"),
+            panel.border=element_rect(colour="black", fill=NA, size=1),
+            plot.title = element_text(size=12, face = "bold"),
+            axis.text=element_text(size=12, family="sans", colour="black"), 
+            axis.title.x=element_text(size=12, family="sans", colour="black"), 
+            axis.title.y=element_text(size=12, family="sans", colour="black"))
+    
+    ## enrichment plots
+    cell_type_table$GeneRatio[cell_type_table$GeneRatio==0]<-0.001 ## add small value to display non-enriched pathways
+    cell_type_table$CellType <- factor(cell_type_table$CellType, levels=cell_type_table$CellType[order(cell_type_table$GeneRatio)])
+    
+    cell_type_plot <- ggplot(cell_type_table, aes(x=CellType, y=GeneRatio, fill=qval)) +
+      geom_bar(stat = "identity") + xlab("") + coord_flip() +
+      scale_colour_gradient2(limits = c(0, 1)) +
+      theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
+            panel.background=element_blank(), axis.line=element_line(colour="black"),
+            panel.border=element_rect(colour="black", fill=NA, size=1),
+            plot.title = element_text(size=12, face = "bold"),
+            axis.text=element_text(size=12, family="sans", colour="black"), 
+            axis.title.x=element_text(size=12, family="sans", colour="black"), 
+            axis.title.y=element_text(size=12, family="sans", colour="black"))
     
     ##--------------------------
     ## predict Dx/Banff score probabilities
@@ -548,79 +633,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     }
   
     options(scipen = 0)
-  
-    ##--------------------------
-    ## PCA of molecular scores
-    ##--------------------------
-  
-    #table(mscores_ref$Dx)
-    pca_scores <- c("normal", "AMR", "TCMR", "ATI", "IFTA") #pca input
-    #pca_scores <- c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score")
-  
-    ## keep only Bx with all molecular scores
-    mscores_pca <- mscores_ref[apply(mscores_ref[,pca_scores], 1, function(x) { all(!is.na(x)) }),]
-  
-    resPCA <- FactoMineR::PCA(mscores_pca[,pca_scores], scale.unit=FALSE, ncp=5, graph=FALSE)
-  
-    ## impute missing values
-    #mc_scores_imputed <- missMDA::imputePCA(mc_scores, ncp=5, method="Regularized", scale=TRUE)
-    #resPCA <- FactoMineR::PCA(mc_scores_imputed, scale.unit=FALSE, ncp=5, graph=FALSE)
-  
-    #factoextra::get_pca_var(resPCA)
-    plot(resPCA, choix = "var") # variable graph
-    #factoextra::fviz_screeplot(resPCA, ncp=5) #scree plot
-  
-    pca.df <- as.data.frame(resPCA$ind$coord)
-    pca.df$ID <- rownames(pca.df)
-    pca.df <- merge(pca.df, mscores_ref[,c("ID", "Dx")], by="ID", all.x=TRUE)
-  
-    ## simple Dx
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_amr, "AMR", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_tcmr, "TCMR", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_normal, "No specific Dx", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_ati, "ATI", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_ifta, "IFTA", pca.df$Dx)
-  
-    pca.df <- pca.df[pca.df$Dx %in% c("AMR", "TCMR", "No specific Dx", "ATI", "IFTA"),]
-    my_cols=c("firebrick", "#009E73", "gray80", "black", "steelblue")
-  
-    ## colorblind friendly palette
-    #my_cols <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-    #my_cols=c("firebrick", "gray80", "darkgray", "slategray", "turquoise", "paleturquoise", "forestgreen", "orange", "mediumpurple",
-    #          "black", "steelblue", "springgreen", "ivory3", "salmon", "salmon", "dodgerblue", "darkviolet", "sienna", "blue3")
-    #my_cols <- viridis::viridis(30)
-  
-    paste(levels(factor(pca.df$Dx)), my_cols)
-    table(pca.df$Dx)
-  
-    ref_pca <- ggplot() +
-      scale_fill_manual(values=my_cols) +
-      geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
-      #geom_text_repel(data=pca.df, aes(Dim.1, Dim.2, label=ID), size=2, colour="gray", max.overlaps=10) +
-      xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
-      ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-      theme(legend.position="top", legend.title=element_blank(),
-          panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
-          panel.background=element_blank(), 
-          axis.line=element_line(colour="white"),
-          axis.text=element_text(size=12), 
-          axis.text.x=element_text(face="bold", size=12, angle=0),
-          axis.title.x=element_text(face="bold", size=12, angle=0), 
-          axis.title.y=element_text(face="bold", size=12),  
-          panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-  
-    ## get outlier sample ID(s)
-    #pca.df[pca.df$Dim.1 < -0.4 & pca.df$Dx != "TCMR",]
-    #pca.df[pca.df$Dim.1 > 0.4 & pca.df$Dx != "AMR",]
-  
+
     ##-----------------------
     ## output IQR and median scores by Dx for reference biopsies
     scores_keep <- c("AMR", "TCMR", "ATI", "IFTA", "normal",
                    "g0_score", "ptc0_score", "cg0_score",
                    "i1_score", "t1_score", "v0_score",
                    "ci1_score", "ct1_score", "cv1_score")
-  
-    #ref.tab <- merge(pca.df, mc_tab, by="ID") ## simplified Dx + PCs + molecular scores
   
     ref.tab <- mscores_ref ## complete Dx + molecular scores
     #ref.tab <- ref.tab[apply(ref.tab[,-1], 1, function(x) { all(!is.na(x)) }),] #exclude samples without all molecular scores
@@ -800,7 +819,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
   
     ##--------------------------
     ## combine refset and new molecular scores
-    #all(colnames(mc_scores) == colnames(new.scoreTable[,scores_keep]))
+    ## scores to input to PCA
+    pca_scores <- c("normal", "AMR", "TCMR", "ATI", "IFTA")
+    #pca_scores <- c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score")
+    
+    ## keep only Bx with all molecular scores
+    mscores_pca <- mscores_ref[apply(mscores_ref[,pca_scores], 1, function(x) { all(!is.na(x)) }),]
+    
     mscores_all <- rbind(mscores_ref[,pca_scores], mscores_new[,pca_scores])
   
     resPCA <- FactoMineR::PCA(mscores_all, scale.unit=FALSE, ncp=5, graph=FALSE)
@@ -849,27 +874,25 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               axis.title.y=element_text(face="bold", size=12),  
               panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
   
+    pca_new_2_3 <- ggplot() +
+      scale_fill_manual(values=my_cols) +
+      geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.2, Dim.3, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
+      geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=4, alpha=1, fill="orange") +
+      xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
+      ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
+      theme(legend.position="top", legend.title=element_blank(),
+            panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
+            panel.background=element_blank(), 
+            axis.line=element_line(colour="white"),
+            axis.text=element_text(size=12), 
+            axis.text.x=element_text(face="bold", size=12, angle=0),
+            axis.title.x=element_text(face="bold", size=12, angle=0), 
+            axis.title.y=element_text(face="bold", size=12),  
+            panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+    
     if (saveFiles=="TRUE") {
       ggsave(paste0(newOut, "/pca_dx_pc1_pc2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_new_1_2, device="pdf", width=7, height=6)
     }
-  
-    pca_new_2_3 <- ggplot() +
-        scale_fill_manual(values=my_cols) +
-        geom_point(data=pca.df[pca.df$ref=="ref",], aes(x=Dim.3, y=Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
-        geom_point(data=pca.df[pca.df$ref=="new",], aes(x=Dim.3, y=Dim.2), shape=23, size=4, alpha=1, fill="orange") +
-        geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(x=Dim.3, y=Dim.2, label=ID), size=4, colour="orange") +
-        xlab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
-        ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-        theme(legend.position="top", legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
-              panel.background=element_blank(), 
-              axis.line=element_line(colour="white"),
-              axis.text=element_text(size=12), 
-              axis.text.x=element_text(face="bold", size=12, angle=0),
-              axis.title.x=element_text(face="bold", size=12, angle=0), 
-              axis.title.y=element_text(face="bold", size=12),  
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-      #ggsave(paste0(newOut, "/pca_dx_pc2_pc3_", newID, "_", Sys.Date(), ".pdf"), plot=last_plot(), device="pdf", width=7, height=6)
   
     ##-----------------------------
     ## KNN: k-nearest neighbors
@@ -1032,10 +1055,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               knn=nn_dx,
               aa_cluster_table=cluster_table,
               aa_cluster_new=pred_aa, #new sample cluster probs
-              pca_molecular_scores=pca_new_1_2,
+              pca_1_2=pca_new_1_2,
+              pca_2_3=pca_new_2_3,
               pca_archetype=pca_aa,
               pathways=pathway_table,
-              cell_types=cell_type_table)
+              pathway_plot=pathway_plot,
+              cell_types=cell_type_table,
+              cell_type_plot=cell_type_plot)
           )
   
 }
