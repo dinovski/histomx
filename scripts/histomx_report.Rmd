@@ -302,7 +302,7 @@ kable(newPreds$knn, row.names=FALSE, align='c', caption="", format="html") %>%
 ***
 ### Pathway analysis
 <div style="margin-bottom:20px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Enrichment of genes with expression in the tested biopsy greater than 2 standard deviations of the median expression in all normal biopsies associated with the listed pathway.'}
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Enrichment of genes associated with the listed pathway with expression in the tested biopsy greater than 2 standard deviations of the median expression in all normal biopsies.'}
 #pw_df <- newPreds$pathways
 #pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
 #kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
@@ -315,7 +315,7 @@ newPreds$pathway_plot
 
 ### Cell-type analysis
 <div style="margin-bottom:20px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Enrichment of genes with expression in the tested biopsy greater than 2 standard deviations of the median expression in all normal biopsies associated with the listed cell type.'}
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Enrichment of genes associated with the listed cell type with expression in the tested biopsy greater than 2 standard deviations of the median expression in all normal biopsies.'}
 #ct_df <- newPreds$cell_types
 #ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
 
