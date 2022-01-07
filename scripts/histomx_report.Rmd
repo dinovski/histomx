@@ -18,7 +18,7 @@ params:
 ## to run manually
 rmarkdown::render('./scripts/histomx_report.Rmd')
 ## convert output html to paged PDF 
-system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
+system('wkhtmltopdf --javascript-delay 1 histomx_report.html histomx_report.pdf')
 ```
 
 ```{r setup, include=FALSE, echo=FALSE}
