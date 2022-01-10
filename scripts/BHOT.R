@@ -179,10 +179,10 @@ qcAttributes <- function(attributes_table) {
         cat(">>All samples pass Imaging QC\n")
     }
     
-    ## Binding density
-    if (any(qcTab$BindingDensity < 0.05 | qcTab$BindingDensity > 2.25)) {
-        cat(">>Binding Density flag: sample(s) out of range (0.05 < BD < 2.25):\n")
-        print.data.frame(qcTab[qcTab$BindingDensity < 0.05 | qcTab$BindingDensity > 2.25,c("ID", "BindingDensity")])
+    ## Binding density: 0.1 to 2.25 for MAX/FLEX instruments; 0.1-1.8 for SPRINT instruments
+    if (any(qcTab$BindingDensity < 0.1 | qcTab$BindingDensity > 2.25)) {
+        cat(">>Binding Density flag: sample(s) out of range (0.1 < BD < 2.25):\n")
+        print.data.frame(qcTab[qcTab$BindingDensity < 0.1 | qcTab$BindingDensity > 2.25,c("ID", "BindingDensity")])
         cat("\n")
     } else {
         cat(">>All samples pass Binding Density QC\n")
@@ -226,6 +226,7 @@ qcCounts <- function(count_table) {
     geo_means <- data.frame(ID=samp_ids, stringsAsFactors=FALSE)
     geo_means$hk_mean <- rep("NA", nrow(geo_means))
     geo_means$pos_mean <- rep("NA", nrow(geo_means))
+    geo_means$neg_mean <- rep("NA", nrow(geo_means))
     geo_means$endo_mean <- rep("NA", nrow(geo_means))
     geo_means$endo_sd3 <- rep("NA", nrow(geo_means))
     
@@ -233,9 +234,11 @@ qcCounts <- function(count_table) {
         sampID <- samp_ids[i]
         hk_counts <- count_table[count_table$CodeClass=="Housekeeping",][sampID][,1]
         pos_counts <- count_table[count_table$CodeClass=="Positive",][sampID][,1]
+        neg_counts <- count_table[count_table$CodeClass=="Negative",][sampID][,1]
         endo_counts <- count_table[count_table$CodeClass=="Endogenous",][sampID][,1]
         geo_means[geo_means$ID==sampID,"hk_mean"] <- round(geoMean(hk_counts), 3) # geometric mean of HK genes
         geo_means[geo_means$ID==sampID,"pos_mean"] <- round(geoMean(pos_counts), 3) # geometric mean of positive controls
+        geo_means[geo_means$ID==sampID,"neg_mean"] <- round(geoMean(neg_counts), 3) # geometric mean of negative controls
         geo_means[geo_means$ID==sampID,"endo_mean"] <- round(geoMean(endo_counts), 3) # geometric mean of endogenous genes
         geo_means[geo_means$ID==sampID,"endo_sd3"] <- round(3*geoMean(endo_counts), 3)
     }
@@ -244,7 +247,7 @@ qcCounts <- function(count_table) {
         cat("Assay Efficiency is low for the following samples:\n");
         cat(geo_means[which(geo_means$pos_mean < geo_means$endo_sd3),"ID"], sep="\n")
     } else {
-        cat(">>OK for all samples\n");
+        cat(">>Assay Efficiency is OK for all samples\n");
     }
     
     cat('----------------------------------\n',
@@ -269,24 +272,29 @@ qcCounts <- function(count_table) {
     })
     
     if (any(positiveLinearityQC < 0.95)) {
-        cat(">>Linearity performance is low for:\n",
+        cat(">>Linearity performance is low (<0.95) for:\n",
             names(which(positiveLinearityQC < 0.95)))
     } else {
         cat("\n>>Positive control linearity [lm(counts ~ concentration)] is > 0.95 for all samples\n")
     }
     
+    ## save positive control linearity table
+    PL_table <- data.frame(PL=positiveLinearityQC)
+    PL_table$ID <- rownames(PL_table)
+    
     tab <- pos_tab
-    tab$Name <- NULL
+    #tab$Name <- NULL
     ## supress annoying data table warning message
     suppressWarnings({
     tab <- data.table::melt(tab, measure.vars=samp_ids, verbose=FALSE)
-    colnames(tab) <- c("concentration", "ID", "count")
+    colnames(tab) <- c("Name", "concentration", "ID", "count")
     })
     
-    linearity_plot <- ggplot(tab, aes(x=concentration, y=count, fill=ID)) +
+    linearity_plot <- ggplot(tab, aes(x=concentration, y=count, group=ID, color=ID)) +
         geom_point(shape = 21, size=3) + 
         xlab("raw counts") + ylab("concentration (fM)") +
-        geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, size=1, 
+        geom_text_repel(data=tab, aes(x=concentration, y=count, label=Name), size=4, colour="darkgray") +
+        geom_smooth(aes(fill=ID), method = "lm", fullrange=TRUE, se=TRUE, size=1, 
                     color="slategray", formula = y ~ x, linetype="dashed")
     
     cat('----------------------------------\n',
@@ -319,11 +327,18 @@ qcCounts <- function(count_table) {
         pctLOD[i,"pctLOD"] <- round(length(i_counts[which(i_counts[,1] > i_lod),]) / nrow(i_counts) * 100, 3)
     }
     
-    cat('----------------------------------\n');
-    print(kable(pctLOD[pctLOD$pctLOD < 80,], caption=">>Sample(s) with <80% endogenous genes above the Limit of Detection:"), 
-          warnings=FALSE, row.names=FALSE)
+    pctLOD <- data.frame(pctLOD, stringsAsFactors=FALSE)
     
-    return(linearity_plot)
+    out_tab <- merge(geo_means, pctLOD, by="ID")
+    out_tab <- merge(out_tab, PL_table, by="ID")
+    
+    cat('----------------------------------\n');
+    #print(kable(pctLOD[pctLOD$pctLOD < 80,], caption=">>Sample(s) with <80% endogenous genes above the Limit of Detection:"), 
+    #      warnings=FALSE, row.names=FALSE)
+    
+    return(list(qc_table=out_tab,
+                pos_control_counts=pos_tab,
+                linearity_plot=linearity_plot))
     
 }
 
@@ -331,6 +346,7 @@ qcCounts <- function(count_table) {
 ## QC table and plot functions
 sampleStats <- function(tab) {
     
+    ## endogenous gene stats
     samp_ids <- colnames(tab[,!colnames(tab) %in% c("CodeClass", "Name", "Accession")])
     tab <- tab[tab$CodeClass=="Endogenous",]
     tab <- tab[,!colnames(tab) %in% c("CodeClass", "Name", "Accession")]
@@ -344,8 +360,10 @@ sampleStats <- function(tab) {
                               Median=endoMedian, 
                               Mean=endoMean, 
                               SD=endoSD,
-                              Missing_pct=endoMissing);
+                              Missing_pct=endoMissing)
     stats_df <- round(stats_df, 2)
+    stats_df$ID <- rownames(stats_df)
+    
     return(stats_df)
 }
 
@@ -446,7 +464,7 @@ NSnorm <- function(eset, background_correction, take_log) {
     ns_fdat <- fData(eset)
     
     posTab <- t(ns_counts[rownames(ns_counts) %in% ns_fdat[ns_fdat$CodeClass=="Positive","Name"],])
-    ## exclude POS_F? (considered below lod)
+    ## exclude POS_F (considered below lod)
     
     ## arithmetic mean of the geometric means of positive controls
     pos.sample <- apply(posTab, MARGIN=1, FUN=geoMean);
@@ -719,9 +737,11 @@ rccQC <- function(RCCfile, outPath) {
     attTable <- data.frame(t(attTable))
     sampID <- attTable$sampID
     
+    newOut <- paste0(outPath, sampID, "/")
+    dir.create(newOut, recursive=TRUE, showWarnings=FALSE)
+    
     numeric_vars <- c("FileVersion", "laneID", "BindingDensity", "FovCount", "FovCounted")
     attTable[,numeric_vars] <- sapply(attTable[,numeric_vars], as.numeric)
-    #attTable[numeric_vars,] <- sapply(attTable[numeric_vars,], as.numeric)
     
     ## recommended threshold: >75%
     attTable$'% registered FOVs' <- round(attTable$FovCounted/attTable$FovCount*100, 2)
@@ -767,8 +787,9 @@ rccQC <- function(RCCfile, outPath) {
     attTable$'PCL' <- pcl
     
     plot_pos_linearity <- ggplot(pos, aes(x=Conc, y=Count)) + ggtitle(paste(expression(R^2), " = ", pcl)) +
-        geom_point(shape = 21, colour="darkblue", size=3, fill = "dodgerblue") + 
-        xlab("raw counts") + ylab("concentration") +
+        geom_point(shape = 21, colour="darkblue", size=3, fill = "dodgerblue") +
+        xlab("concentration") + ylab("raw counts") +
+        geom_text_repel(data=pos, aes(x=Conc, y=Count, label=Name), size=4, colour="darkgray") +
         geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, size=1, 
                     color="slategray", formula = y ~ x, linetype="dashed")
     ggsave(paste0(outPath, sampID, "/pcl_plot_", sampID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
