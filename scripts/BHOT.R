@@ -253,14 +253,16 @@ qcCounts <- function(count_table) {
     cat('----------------------------------\n',
         'Positive Control Linearity:\n',
         '(correlation between the observed counts and concentrations of Positive ERCC probes)\n')
+    ## Very low assay efficiency: If the counts of all the positive controls are very low (less than ~500 even for POS_A)
     
     pos_tab <- count_table[count_table$CodeClass=="Positive",c("Name", samp_ids)]
     
     ## POS_F is considered below the limit of detection: remove when calculating linearity
+    ## POS_F counts are significantly higher than the negative control counts in most cases
     pos_tab <- pos_tab[grep("POS_F", pos_tab$Name, invert=TRUE),]
     
     if (!all(grepl("[[:digit:]]", pos_tab$Name))) {
-        stop("Positive controls must have concentrations, eg. POS_A(128)")
+        stop("Positive controls must include concentrations in their names, eg. POS_A(128)")
     }
     
     ## extract positive control concentration
@@ -374,14 +376,13 @@ sampleStats <- function(tab) {
 ##------------------
 ## Housekeeping gene QC and selection
 ## candidate housekeeping genes have a high mean and very low variance
+## gene_annotations includes "CodeClass", "Name", "Accession"
 ## group_labels is optional
-hkQC <- function(raw_counts, group_labels) {
+hkQC <- function(raw_counts, gene_annotations, group_labels) {
     
-    samp_ids <- colnames(ns.counts[,!colnames(ns.counts) %in% c("CodeClass", "Name", "Accession")])
-    
-    hk_counts <- ns.counts[ns.counts$CodeClass=="Housekeeping",c("Name", samp_ids)]
-    rownames(hk_counts) <- hk_counts$Name
-    hk_counts$Name <- NULL
+    #hk_counts <- raw_counts[raw_counts$CodeClass=="Housekeeping",c("Name", samp_ids)]
+    hk_genes <- gene_annotations[gene_annotations$CodeClass=="Housekeeping","Name"]
+    hk_counts <- as.matrix(raw_counts[,colnames(raw_counts) %in% hk_genes])
     
     ## TODO: exlcude HK genes below limit of detection
     
@@ -394,7 +395,7 @@ hkQC <- function(raw_counts, group_labels) {
     ## gene-stability value M: the average pairwise variation of a particular gene with all other control genes. 
     ## Genes with the lowest M values have the most stable expression
     
-    hk_gn <- NormqPCR::selectHKs(t(hk_counts), method = "geNorm", Symbols=colnames(t(hk_counts)), na.rm=TRUE, minNrHK=2, log=FALSE)
+    hk_gn <- NormqPCR::selectHKs(hk_counts, method = "geNorm", Symbols=colnames(hk_counts), na.rm=TRUE, minNrHK=2, log=FALSE)
     
     hk_rank <- data.frame(rank=names(hk_gn$rank), gene=hk_gn$rank, stringsAsFactors=FALSE)
     
@@ -417,13 +418,12 @@ hkQC <- function(raw_counts, group_labels) {
     ## select HK genes to be used in normalization
     ## manually or automatically (M<0.7): experimental value shown to eliminate most variable genes in microarray data
     num_hk_genes=as.numeric(as.character(hk_m[hk_m$meanM<0.7,][1,"n_genes"]))
-    #num_hk_genes=5
     
     hk_genes_keep <- hk_rank[1:num_hk_genes,"gene"]
-    hk_genes_remove <- rownames(hk_counts)[!rownames(hk_counts) %in% hk_genes_keep]
+    hk_genes_remove <- colnames(hk_counts)[!colnames(hk_counts) %in% hk_genes_keep]
     
     ## 02: NormFinder method, Andersen et al. 2004; use if groups available
-    #hk_nf <- NormqPCR::selectHKs(t(hk_counts), method = "NormFinder", group=group_labels, Symbols=colnames(mat), minNrHK = 2, log = FALSE)
+    #hk_nf <- NormqPCR::selectHKs(hk_counts, method = "NormFinder", group=group_labels, Symbols=colnames(hk_counts), minNrHK = 2, log = FALSE)
     ## ideally: start with 3 control genes > stepwise inclusion of more control genes until the (n + 1)th gene has 
     ## no significant contribution to the newly calculated normalization factor
     
@@ -431,13 +431,17 @@ hkQC <- function(raw_counts, group_labels) {
     ## if available, NB regression between hk_genes ~ biological conditions/outcomes of interest
     if (length(group_labels)>0) { 
         
-        hk_pvals = data.frame(gene=rownames(hk_counts), pval=rep(NA, nrow(hk_counts)))
+        hk_pvals = data.frame(gene=colnames(hk_counts), pval=rep(NA, ncol(hk_counts)))
         
-        for (i in 1:nrow(hk_counts)){
-            hk_nb <- MASS::glm.nb(as.numeric(hk_counts[i,]) ~ as.factor(group_labels))
+        for (i in 1:ncol(hk_counts)){
+            hk_nb <- MASS::glm.nb(as.numeric(hk_counts[,i]) ~ as.factor(group_labels))
             hk_pvals$'pval'[i] = coef(summary(hk_nb))[2,4]
+            hk_pvals <- hk_pvals[order(hk_pvals$pval, decreasing=FALSE),]
+            hk_pvals$padj <- p.adjust(hk_pvals$pval, method="bonferroni")
         }
         
+        ## exclude genes with padj<0.05
+        hk_genes_remove <- append(hk_genes_remove, hk_pvals[hk_pvals$padj<0.05,"gene"])
         hk_list <- list(hk_plot=gp_hk, nb_pvals=hk_pvals, exclude=hk_genes_remove)
     } else {
         hk_list <- list(hk_plot=gp_hk, exclude=hk_genes_remove)
