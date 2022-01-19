@@ -18,7 +18,7 @@ params:
 ## to run manually
 rmarkdown::render('./scripts/histomx_report.Rmd')
 ## convert output html to paged PDF 
-system('wkhtmltopdf --javascript-delay 1 histomx_report.html histomx_report.pdf')
+system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
 ```
 
 ```{r setup, include=FALSE, echo=FALSE}
@@ -38,8 +38,9 @@ library(kableExtra, quietly=TRUE)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, echo=FALSE, include=TRUE}
+```{r, echo=FALSE, include=F}
 logoIMG='../static/multi-logos.png'
+#logoIMG='../static/ptg-logo.png'
 
 htmltools::img(src = knitr::image_uri(logoIMG), 
                alt = 'logo', 
@@ -103,7 +104,7 @@ if(!is.na(file.info(newPatient)$size)) {
     ## display empty data frame
     pt_df <- data.frame('Platform ID'=newPreds$score_table$ID,
                         'Date of transplantation'=" ", 'Date of biopsy'=" ",
-                        'Donor type'='\\t+', 'Donor age'="    ", 'Biopsy indication'="    ", check.names=FALSE)
+                        'Biopsy indication'="    ", check.names=FALSE)
     pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
   }
 
@@ -154,7 +155,7 @@ rownames(tab) <- rownames(ms_new)
 tab[rownames(tab)=="AMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","AMR"]
 tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","AMR"]
 
-## reference biopsy TCMR molecular score ranges
+## reference biopsy acute TCMR molecular score ranges
 # tab[rownames(tab)=="TCMR","AMR Q1"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="25%","TCMR"]
 # tab[rownames(tab)=="TCMR","AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%","TCMR"]
 # tab[rownames(tab)=="TCMR","TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%","TCMR"]
@@ -196,7 +197,7 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
 
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, acute TCMR, chronic active TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
@@ -208,7 +209,7 @@ ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i
  
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
-colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3", 
+colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
                    "ATI Q1", "ATI Q3", "IFTA Q1", "IFTA Q3",
                    "No lesion Q1", "No lesion Q3")
 rownames(tab) <- rownames(ms_new)
@@ -263,33 +264,28 @@ kable(ref_quantiles, row.names=FALSE, align='c', format="html") %>%
     column_spec(2, bold=TRUE, color="dodgerblue") %>%
     row_spec(c(1,3,5), background="whitesmoke") %>% row_spec(c(2,4,6), background="white")
 
+#Ranges are defined by Q1 and Q3, the upper and lower bounds of the middle 50% of the reference biopsy molecular scores for each histology based diagnosis.
 ```
 Banff lesion based molecular scores represent the probability that a biopsy has a Banff score >0 or >1, as indicated for each lesion.  
 
 __Interpretations:__   
 unlikely (<10%), low (10-20%), moderate (20-40%),  
-moderate/high (40-60%), high (60-80%), very high (80-100%)  
-
-Ranges are defined by Q1 and Q3, the upper and lower bounds of the middle 50% of the reference biopsy molecular scores for each histology based diagnosis.
+moderate/high (40-60%), high (60-80%), very high (80-100%)
 
 ***
 ## Principal Components Analysis (PCA) of molecular scores:
-### PCA labeled by histologic diagnosis
-<div style="margin-bottom:20px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='The tested sample is represented by the yellow diamond.'}
-newPreds$pca_1_2
-```
-</div>
+<div style="margin-bottom:10px;">
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Samples are labeled by histologic diagnosis. The tested sample is the yellow diamond.'}
 
-<div style="margin-bottom:20px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center'}
-newPreds$pca_2_3
+#gridExtra::grid.arrange(newPreds$pca_1_2, newPreds$pca_2_3, ncol=2)
+newPreds$pca_1_2
+#newPreds$pca_2_3
+
 ```
 </div>
 
 ***
 ### Histologic Diagnosis of 50 Nearest Neighbors
-<div style="margin-bottom:30px;">
 ```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
 newPreds$knn$Dx <- rownames(newPreds$knn)
 newPreds$knn <- newPreds$knn[,c("Dx", "Total", "Percent")]
@@ -297,47 +293,51 @@ newPreds$knn <- newPreds$knn[,c("Dx", "Total", "Percent")]
 kable(newPreds$knn, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(c(1,2,3), bold=TRUE, background="white")
 ```
-</div>
+&nbsp;  
 
 ***
 ### Pathway analysis
-<div style="margin-bottom:20px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Enrichment of genes associated with the listed pathway with expression in the tested biopsy greater than 2 standard deviations of the median expression in all normal biopsies.'}
-#pw_df <- newPreds$pathways
-#pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
-#kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
-#          row_spec(1:nrow(pw_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the # of enriched genes; GeneRatio=the % of total genes associated with the pathway).'}
 
-newPreds$pathway_plot
+#gridExtra::grid.arrange(newPreds$cell_type_radar, newPreds$pathway_radar, ncol=2, nrow=1)
 
-```
-</div>
+newPreds$pathway_radar
 
-### Cell-type analysis
-<div style="margin-bottom:20px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Enrichment of genes associated with the listed cell type with expression in the tested biopsy greater than 2 standard deviations of the median expression in all normal biopsies.'}
-#ct_df <- newPreds$cell_types
-#ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
-
-#kable(ct_df, row.names=FALSE, col.names=rep("", ncol(ct_df)), align='c', format="html") %>%
-#          row_spec(1:nrow(ct_df), background="white") %>% column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-newPreds$cell_type_plot
+# pw_df <- newPreds$pathways
+# pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
+# kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
+#           row_spec(1:nrow(pw_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
 
 ```
-</div>
+
+\newpage
+
+***
+### Cell type analysis
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed cell type.'}
+
+newPreds$cell_type_radar
+
+# ct_df <- newPreds$cell_types
+# ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
+# kable(ct_df, row.names=FALSE, col.names=rep("", ncol(ct_df)), align='c', format="html") %>%
+#           row_spec(1:nrow(ct_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
+
+```
 
 ***
 ### Clinician signout
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
-kable(data.frame(Name=">", Signature=""), align='c', format="html") %>% kableExtra::kable_styling(position="center") %>%
+sign_df <- data.frame(Name=">", Signature="")
+
+kable(sign_df, align='c', format="html") %>% kableExtra::kable_styling(position="center") %>%
   row_spec(1, background="white", align='l')
 ```
 > **_Comments:_**  
-> $~$  
-> $~$  
-> $~$  
-> $~$  
+>  &nbsp;    
+>  &nbsp;  
+>  &nbsp;  
+>  &nbsp;    
 
 ***
 ## Technical details
@@ -355,16 +355,18 @@ if(!is.na(file.info(newRNA)$size)) {
     rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])
   }
 
-  ## if units (ng/ul) included in RNA concentration strip
+  ## if units (ng/ul) included in RNA concentration strip; else convert to numeric
   if(length(strsplit(rna_df$concentration, " ")[[1]]) > 1) {
     rna_df$concentration <- as.numeric(strsplit(rna_df$concentration, " ")[[1]][1])
+  } else {
+    rna_df$concentration <- as.numeric(rna_df$concentration)
   }
 
   ## move concentration to end
   rna_df <- rna_df %>% relocate(concentration, .after=last_col())
 
   ## apply threshold based text color and add back units
-  if(rna_df$concentration>=20) {
+  if(rna_df$concentration >= 20) {
       rna_df$status <- "Passed"
       rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
       status_color="green"
@@ -372,7 +374,7 @@ if(!is.na(file.info(newRNA)$size)) {
       rna_df$status <- "Caution"
       rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
       status_color="goldenrod"
-  } else if(rna_df$concentration<10) {
+  } else if(rna_df$concentration < 10) {
       rna_df$status <- "Warning"
       rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
       status_color="firebrick"

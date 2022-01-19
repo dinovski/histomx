@@ -1,6 +1,6 @@
 
 ## Load dependencies
-library_list <- c("DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "archetypes")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
@@ -49,8 +49,8 @@ assessPrediction <- function(truth, predicted, print.results=TRUE) {
     result$TNR = 100*TN/N
     result$FDR = 100*FP/(TP+FP)
     result$FPR = 100*FP/N
-    result$F1 = 2*((precision*recall)/(precision+recall))*100 #harmonic mean
     result$b_accuracy = (result$TPR + result$TNR)/2 #balanced accuracy
+    result$F1 = 2*((precision*recall)/(precision+recall))*100 #harmonic mean
     if ( print.results ) {
         cat("PPV: (precision)=TP/(TP+FP)= ", signif(result$PPV,3),"%\n",sep="")
         cat("TPR: (sensitivity)=TP/(TP+FN)= ", signif(result$TPR,3),"%\n",sep="") ##recall
@@ -64,25 +64,27 @@ assessPrediction <- function(truth, predicted, print.results=TRUE) {
 }
 
 ##-------------------------------------------------
-## plot score cutoff versus TPR, TNR, Accuracy
+## plot score cutoff versus TPR, TNR, Accuracy, F1
 plotPrediction <- function(truth, predicted, threshold) {
-    cutoffs <- data.frame(matrix(nrow=length(seq(0,1, 0.1)), ncol=4))
-    colnames(cutoffs) <- c("cutoff", "TPR", "TNR", "Accuracy")
+    cutoffs <- data.frame(matrix(nrow=length(seq(0,1, 0.1)), ncol=5))
+    colnames(cutoffs) <- c("cutoff", "TPR", "TNR", "Accuracy", "F1")
     cutoffs$cutoff <- seq(0,1, 0.1)
     
     for (i in 1:nrow(cutoffs)) {
         cutpoint <- cutoffs$cutoff[i]
-        cutoffs[i,2] <-t(assess.prediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[3]/100
-        cutoffs[i,3] <-t(assess.prediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[4]/100
-        cutoffs[i,4] <-t(assess.prediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[1]/100
+        cutoffs[i,2] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[3]/100
+        cutoffs[i,3] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[4]/100
+        cutoffs[i,4] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[1]/100
+        cutoffs[i,5] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[7]/100
     }
     
-    plot(cutoffs$cutoff, cutoffs$TPR, col="blue", type="l", lty=3, lwd=2, xlab="ABMR score cutoff", ylab="")
-    lines(cutoffs$cutoff, cutoffs$TNR, col="red", lty=3, lwd=2)
-    lines(cutoffs$cutoff, cutoffs$Accuracy, lty=3, lwd=2)
-    abline(v=threshold, col="gray", lty=3, lwd=1.5)
-    legend(0.5, 0.2, legend = c("TPR", "TNR", "Accuracy"), col = c("blue", "red", "black"), 
-           lty=3, bty = "o", pt.cex=2, lwd=2, cex=0.8, text.col = "black")
+    plot(cutoffs$cutoff, cutoffs$TPR, col="blue", type="l", lty=4, lwd=2, xlab="score cutoff", ylab="")
+    lines(cutoffs$cutoff, cutoffs$TNR, col="red", lty=4, lwd=2)
+    lines(cutoffs$cutoff, cutoffs$Accuracy, col="black", lty=3, lwd=2)
+    lines(cutoffs$cutoff, cutoffs$F1, col="purple", lty=4, lwd=2)
+    abline(v=threshold, col="gray", lty=4, lwd=1.5)
+    legend(0.5, 0.2, legend = c("TPR", "TNR", "Accuracy", "F1"), col = c("blue", "red", "black", "purple"), 
+           lty=4, bty = "o", pt.cex=2, lwd=2, cex=0.8, text.col = "black")
 }
 
 ##------------------------------

@@ -32,6 +32,8 @@ mscores_ref <- read.table(mscores_all_file, header=TRUE, sep='\t')
 rownames(mscores_ref) <- mscores_ref$ID
 colnames(mscores_ref)[colnames(mscores_ref)=="amr"]<-"AMR"
 colnames(mscores_ref)[colnames(mscores_ref)=="tcmr"]<-"TCMR"
+colnames(mscores_ref)[colnames(mscores_ref)=="atcmr"]<-"aTCMR"
+colnames(mscores_ref)[colnames(mscores_ref)=="catcmr"]<-"caTCMR"
 colnames(mscores_ref)[colnames(mscores_ref)=="ati"]<-"ATI"
 colnames(mscores_ref)[colnames(mscores_ref)=="ifta"]<-"IFTA"
 
@@ -118,12 +120,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     new.ns.data <- parseRCC(newRCC)
     newID <- colnames(new.ns.data$attributes)[2]
   
-    ## rename newID if also exists in refset sample names: rownames(mscores_ref)
-    samp_ind <- grep(newID, rownames(mscores_ref))
-    if (isTRUE(length(samp_ind) > 1)) {
-      newID <- gsub("histomx-new", colnames(countTable)[samp_ind[2]])
-    }
-  
     ## verify BHOT sequencing panel
     newRLF <- new.ns.data$attributes[new.ns.data$attributes$variable=="GeneRLF",newID]
   
@@ -144,6 +140,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
   
     countTable <- ns.data$counts
     rownames(countTable) <- countTable$Name
+    
+    ## rename newID if also exists in refset sample names: rownames(mscores_ref)
+    samp_ind <- grep(newID, colnames(countTable))
+    if (length(samp_ind) > 1) {
+      colnames(countTable)[samp_ind][1]<-newID
+      colnames(countTable)[samp_ind][2]<-"histomx-new"
+    }
     
     ## keep only samples used in classifiers
     ## TODO: eventually exclude unused files from final repo
@@ -283,9 +286,73 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     cell_type_table <- merge(cell_type_table, bhot_cell_type_totals, by="CellType")
     
     ## ratio of enriched genes per category
-    pathway_table$GeneRatio <- round(pathway_table$Count/pathway_table$Total, 3)
-    cell_type_table$GeneRatio <- round(cell_type_table$Count/cell_type_table$Total, 3)
+    pathway_table$GeneRatio <- round(pathway_table$Count/pathway_table$Total*100, 3)
+    cell_type_table$GeneRatio <- round(cell_type_table$Count/cell_type_table$Total*100, 3)
       
+    ##-------------
+    ## Radar plot: pathways
+    pathway_radar <- ggplot(pathway_table) +
+      # add custom panel grid
+      geom_hline(aes(yintercept = y), data.frame(y = c(0:max(pathway_table$GeneRatio)) ), color = "white") + 
+      # add bars to represent the cumulative track lengths
+      geom_col(aes(x = reorder(str_wrap(Pathway, 7), GeneRatio), y = GeneRatio, fill = GeneRatio),
+               position = "dodge2", show.legend = TRUE, alpha = .9) +
+      # line for GeneRatio per pathway
+      geom_segment(aes(x = reorder(str_wrap(Pathway, 7), GeneRatio), y = 0,
+                       xend = reorder(str_wrap(Pathway, 7), GeneRatio),
+                       yend = max(GeneRatio)), linetype = "dashed", color = "navy") + 
+      # Add dots to represent the count
+      geom_point(aes(x=reorder(str_wrap(Pathway, 7), Count), y = Count), size = 3, color = "navy") +
+      geom_text_repel(data=pathway_table[pathway_table$Count>0,], ## add count for pathways with count>0
+                      aes(x=reorder(str_wrap(Pathway, 7), Count), y = Count, label=Count), size=3, colour="navy") +
+      coord_polar(clip="off") +
+      # Scale y axis so bars don't start in the center
+      #scale_y_continuous(limits = c(-10, max(pathway_table$Total)),expand = c(0, 0), breaks = c(0, 5, 10, 20)) + 
+      #scale_fill_gradientn("Number of genes", colours = c( "#6C5B7B","#C06C84","#F67280","#F8B195"))
+      theme(axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            axis.text.y = element_blank(),
+            axis.text.x = element_text(color="navy", size=10, face="bold"),
+            panel.background = element_rect(fill = 'white', colour = 'white'),
+            #plot.background=element_rect(fill="white"),
+            #panel.grid.minor=element_line(colour="gray"),
+            panel.grid.major=element_line(colour="gray"),
+            panel.border=element_rect(colour=NA, fill=NA, size=5),
+            legend.title = element_text(size=10),
+            legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
+            legend.position="right")
+    
+    ## Radar plot: cell types
+    cell_type_radar <- ggplot(cell_type_table) +
+      geom_hline(aes(yintercept = y), data.frame(y = c(0:max(pathway_table$GeneRatio)) ), color = "white") + 
+      geom_col(aes(x = reorder(str_wrap(CellType, 7), GeneRatio), y = GeneRatio, fill = GeneRatio),
+               position = "dodge2", show.legend = TRUE, alpha = .9) +
+      geom_segment(aes(x = reorder(str_wrap(CellType, 7), GeneRatio), y = 0,
+                       xend = reorder(str_wrap(CellType, 7), GeneRatio),
+                       yend = max(GeneRatio)), linetype = "dashed", color = "navy") + 
+      # Add dots to represent the count
+      geom_point(aes(x=reorder(str_wrap(CellType, 7), Count), y = Count), size = 3, color = "navy") +
+      geom_text_repel(data=cell_type_table[cell_type_table$Count>0,],
+                      aes(x=reorder(str_wrap(CellType, 7), Count), y = Count, label=Count), size=3, colour="navy") +
+      coord_polar(clip="off") +
+      # Scale y axis so bars don't start in the center
+      #scale_y_continuous(limits = c(-10, max(pathway_table$Total)),expand = c(0, 0), breaks = c(0, 5, 10, 20)) + 
+      #scale_fill_gradientn("Number of genes", colours = c( "#6C5B7B","#C06C84","#F67280","#F8B195"))
+      theme(axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            axis.text.y = element_blank(),
+            axis.text.x = element_text(color="navy", size=10, face="bold"),
+            panel.background = element_rect(fill = 'white', colour = 'white'),
+            #plot.background=element_rect(fill="white"),
+            #panel.grid.minor=element_line(colour="gray"),
+            panel.grid.major=element_line(colour="gray"),
+            panel.border=element_rect(colour=NA, fill=NA, size=5),
+            legend.title = element_text(size=10),
+            legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
+            legend.position="right")
+    
+    
+    ##-------------
     ## Test for enrichment
     # my.counts<-matrix(c(pathway_table$Count[i],
     #                     pathway_table$Total[i] - pathway_table$Count[i],
@@ -609,10 +676,10 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     ## score table
     options(scipen = 999)
     join_list <- list(new.normal.pred, new.amr.pred, new.tcmr.pred,
-                    new.ati.pred, new.ifta.pred,
-                    new.g0.pred, new.ptc0.pred, new.cg0.pred,
-                    new.i1.pred, new.t1.pred, new.v0.pred,
-                    new.cv1.pred, new.ci1.pred, new.ct1.pred)
+                      new.ati.pred, new.ifta.pred,
+                      new.g0.pred, new.ptc0.pred, new.cg0.pred,
+                      new.i1.pred, new.t1.pred, new.v0.pred,
+                      new.cv1.pred, new.ci1.pred, new.ct1.pred)
     tab <- Reduce(function(...) merge(..., all=TRUE), join_list)
     rownames(tab) <- tab$ID
   
@@ -650,7 +717,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_normal, "No specific Dx", ref.tab$Dx)
     ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_ati, "ATI", ref.tab$Dx)
     ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_ifta, "IFTA", ref.tab$Dx)
-    #table(ref.tab$Dx)
   
     ## IQR = Q3 - Q1
     ## Q0= min and Q5=max
@@ -740,7 +806,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     dat.m$value <- dat.m$value * 100
   
     #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
-    boxplot_tcmr <- ggplot(data=dat.m, aes(x=variable, y=value)) + 
+    boxplot_atcmr <- ggplot(data=dat.m, aes(x=variable, y=value)) + 
         ggtitle("TCMR reference biopsies") +
         ylab("molecular score (%)") + xlab("") +
         geom_hline(yintercept=50, linetype="dashed", color="slategray") +
@@ -755,8 +821,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               axis.text.y=element_text(size=14, angle=0),
               axis.title.y=element_text(face="bold", size=14),  
               panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #ggsave(paste0(newOut, "/tcmr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_tcmr, device="pdf", width=8, height=6)
-  
+    #ggsave(paste0(newOut, "/atcmr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_tcmr, device="pdf", width=8, height=6)
+    
     ## ATI
     dat <- ref.tab[ref.tab$Dx=="ATI",]
     dat <- dat[,scores_keep]
@@ -836,8 +902,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     pca.df <- merge(pca.df, mscores_ref[,c("ID", "Dx")], by="ID", all.x=TRUE)
     pca.df$Dx <- ifelse(pca.df$ID %in% mscores_new$ID, "new", pca.df$Dx)
   
-    #pca.df <- pca.df[!is.na(pca.df$Dx),]
-  
     ## higlight new biopsy
     pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx!="new", "ref", "new"))
   
@@ -850,16 +914,14 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
   
     pca.df <- pca.df[pca.df$Dx %in% c("AMR", "TCMR", "ATI", "IFTA", "No specific Dx", "new"),]
   
-    #table(pca.df$Dx)
-  
-    my_cols=c("firebrick", "#009E73", "gray80", "black", "steelblue")
+    my_cols=c("firebrick", "#009E73", "gray80", "black", "blue3") #steelblue;dodgerblue
     paste(levels(factor(pca.df$Dx)), my_cols)
-    table(pca.df$Dx)
+    #table(pca.df$Dx)
   
     pca_new_1_2 <- ggplot() +
         scale_fill_manual(values=my_cols) +
         #geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
-        geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
+        geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=3, alpha=0.7) + 
         geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
         #geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=2, colour="orange") +
         xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
@@ -871,24 +933,24 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               axis.text=element_text(size=12), 
               axis.text.x=element_text(face="bold", size=12, angle=0),
               axis.title.x=element_text(face="bold", size=12, angle=0), 
-              axis.title.y=element_text(face="bold", size=12),  
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+              axis.title.y=element_text(face="bold", size=12),
+              panel.border=element_rect(colour="white", fill=NA, size=5))
   
     pca_new_2_3 <- ggplot() +
       scale_fill_manual(values=my_cols) +
-      geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.2, Dim.3, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
+      geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.2, Dim.3, fill=Dx), shape=21, color="gray", size=3, alpha=0.7) + 
       geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=4, alpha=1, fill="orange") +
       xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
       ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
-      theme(legend.position="top", legend.title=element_blank(),
+      theme(legend.position="none",
             panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
             panel.background=element_blank(), 
             axis.line=element_line(colour="white"),
             axis.text=element_text(size=12), 
             axis.text.x=element_text(face="bold", size=12, angle=0),
             axis.title.x=element_text(face="bold", size=12, angle=0), 
-            axis.title.y=element_text(face="bold", size=12),  
-            panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+            axis.title.y=element_text(face="bold", size=12),
+            panel.border=element_rect(colour="white", fill=NA, size=5))
     
     if (saveFiles=="TRUE") {
       ggsave(paste0(newOut, "/pca_dx_pc1_pc2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_new_1_2, device="pdf", width=7, height=6)
@@ -959,7 +1021,9 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     ## predict archetypes on unseen molecular scores
     mscores_new <- dplyr::rename(mscores_new, amr=AMR)
     mscores_new <- dplyr::rename(mscores_new, tcmr=TCMR)
+    mscores_new <- dplyr::rename(mscores_new, ifta=IFTA)
     mscores_new <- dplyr::rename(mscores_new, ati=ATI)
+    
     pred_aa <- data.frame(predict(aa_model, mscores_new[,colnames(aa_model$archetypes)]))
     rownames(pred_aa) <- newID
     mscores_new$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
@@ -972,7 +1036,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
   
     pca.aa[pca.aa$ref=="new",]
   
-    aa_cols=c("darkviolet", "black", "#009E73", "firebrick", "gray80", "steelblue")
+    aa_cols=c("black", "firebrick", "gray80", "#009E73", "firebrick")
   
     pca_aa <- ggplot() +
         scale_fill_manual(values=aa_cols) +
@@ -995,7 +1059,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     #  ggsave(paste0(newOut, "/pca_archetypes_pc1_2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_aa, device="pdf", width=7, height=6)
     #}
   
-    ggplot() +
+    pca_aa_2_3 <- ggplot() +
         scale_fill_manual(values=aa_cols) +
         geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.2, Dim.3, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
         geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=3, alpha=1, fill="orange") +
@@ -1025,7 +1089,9 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     aa.2.df <- droplevels(aa.df[aa.df$aa_cluster=="2",])
     aa.3.df <- droplevels(aa.df[aa.df$aa_cluster=="3",])
     aa.4.df <- droplevels(aa.df[aa.df$aa_cluster=="4",])
-  
+    aa.5.df <- droplevels(aa.df[aa.df$aa_cluster=="5",])
+    #aa.6.df <- droplevels(aa.df[aa.df$aa_cluster=="6",])
+    
     ## Dx by cluster
     k1.df <- data.frame(table(aa.1.df$Dx))
     k1.df$k <- "1"
@@ -1042,9 +1108,17 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     k4.df <- data.frame(k4=table(aa.4.df$Dx))
     k4.df$k <- "4"
     colnames(k4.df) <- c("Dx", "total", "cluster")
+    
+    k5.df <- data.frame(k5=table(aa.5.df$Dx))
+    k5.df$k <- "5"
+    colnames(k5.df) <- c("Dx", "total", "cluster")
   
+    #k6.df <- data.frame(k6=table(aa.6.df$Dx))
+    #k6.df$k <- "6"
+    #colnames(k6.df) <- c("Dx", "total", "cluster")
+    
     ## Dx by cluster
-    cluster_table <- dplyr::bind_rows(k1.df, k2.df, k3.df, k4.df)
+    cluster_table <- dplyr::bind_rows(k1.df, k2.df, k3.df, k4.df, k5.df)
   
     #write.table(cluster_table, file=paste0(newOut, "/aa_cluster_", newID, "_", Sys.Date(), ".txt"), row.names=F, quote=F, sep='\t')
   
@@ -1060,8 +1134,10 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
               pca_archetype=pca_aa,
               pathways=pathway_table,
               pathway_plot=pathway_plot,
+              pathway_radar=pathway_radar,
               cell_types=cell_type_table,
-              cell_type_plot=cell_type_plot)
+              cell_type_plot=cell_type_plot,
+              cell_type_radar=cell_type_radar)
           )
   
 }
