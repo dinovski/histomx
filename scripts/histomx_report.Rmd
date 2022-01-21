@@ -38,7 +38,7 @@ library(kableExtra, quietly=TRUE)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, echo=FALSE, include=F}
+```{r, echo=FALSE, include=TRUE}
 logoIMG='../static/multi-logos.png'
 #logoIMG='../static/ptg-logo.png'
 
@@ -378,8 +378,6 @@ if(!is.na(file.info(newRNA)$size)) {
       rna_df$status <- "Warning"
       rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
       status_color="firebrick"
-  } else {
-      status_color="black"
   }
 
   kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
