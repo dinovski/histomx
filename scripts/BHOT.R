@@ -680,10 +680,14 @@ plotRLE <- function(counts, is_logged, main) {
 ## feature selection: 10-50 genes
 
 ## Volcano plot
-plotVolcano <- function(df.fit, p_cutoff, plot_title) {
+plotVolcano <- function(df.fit, p_cutoff, num_genes=20, plot_title=NULL) {
     
     df.fit$gene <- rownames(df.fit)
     
+    ##DESeq2 outputs NA values for adjusted p values based on independent filtering of genes which have low counts
+    ## convert these to 1
+    df.fit$padj<- ifelse(is.na(df.fit$padj), 1, df.fit$padj)
+
     df.fit$logP <- -log10(df.fit$pvalue)
     df.fit$logPadj <- -log10(df.fit$padj)
     
@@ -695,7 +699,7 @@ plotVolcano <- function(df.fit, p_cutoff, plot_title) {
     gp_volcano <- ggplot() + ylab("-log10(pval)") + xlab("log2FC") + ggtitle(plot_title) +
         #geom_point(data=df.fit, aes( x=log2FoldChange, y=logP), colour="slategray", size=3, alpha=0.7) +
         geom_point(data=df.fit, aes(x=log2FoldChange, y=logP, color=sig), shape=19, size=3, alpha=0.7) +
-        geom_text_repel(data=head(df.fit, 20), aes(x=log2FoldChange, y=logP, label=gene), colour="gray", size=3) +
+        geom_text_repel(data=head(df.fit, num_genes), aes(x=log2FoldChange, y=logP, label=gene), colour="gray", size=3) +
         scale_color_manual(values=c("dodgerblue", "salmon")) + 
         geom_vline(xintercept=0, linetype="dashed", size=0.4) +
         geom_vline(xintercept=1, linetype="dashed", size=0.2) + geom_vline(xintercept=-1, size=0.2, linetype="dashed") +
