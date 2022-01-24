@@ -30,7 +30,7 @@ quit(save="no")
 
 4. Dowload the histomx code:  
 * Click the 'Code' button at the top of this repository and then 'Download ZIP'
-* Unzip and copy this directory ('histomx-main') to your working directory (eg. ~/Desktop) and rename it to 'histomx'
+* Unzip and copy this directory ('histomx-main') to your working directory (eg. ~/Desktop)
 
 5. In the terminal window, navigate to the histomx directory:
 ```
@@ -39,7 +39,7 @@ cd ~/Desktop/histomx
 
 6. Set variables to define paths to scripts/files
 ```
-HISTOMX_PATH=~/Desktop/histomx 
+HISTOMX_PATH=~/Desktop/histomx-main  
 
 HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report  
 
@@ -77,6 +77,7 @@ With optional patient and RNA sample files:
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run' -p ${HISTOMX_PATH}/test_files/patient-test.txt -r ${HISTOMX_PATH}/test_files/rna-test.txt
 ```
 All output files are written to the same directory as the input RCC file (in this case 'test_files')
+
 
 *Troubleshooting:*  
 If you see an error with 'pandoc' you may need to update your version of RStudio. See here:  
