@@ -1,6 +1,6 @@
 **Generate a HistoMx report for a single RCC file**
 
-R must be installed on your machine. You can dowload it here:  
+R must be installed on your machine. You can download it here:  
 https://cran.r-project.org/bin/macosx/
 
 1. Open the 'Terminal' application on your computer.
