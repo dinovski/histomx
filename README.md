@@ -79,7 +79,7 @@ $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run' -p 
 All output files are written to the same directory as the input RCC file (in this case 'test_files')
 
 
-**TROUBLESHOOTING:** 
+**TROUBLESHOOTING:**  
 If you see an error with 'pandoc' you may need to update your version of RStudio. See here:  
 https://bookdown.org/yihui/rmarkdown-cookbook/install-pandoc.html
 
