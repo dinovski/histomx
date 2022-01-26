@@ -12,7 +12,7 @@ cd ~/Desktop
 
 3. Install all R packages and dependencies.  
 
-First, download the 'histomx_pckgs.Rdmpd' file in the 'static' folder.    
+First, download the 'histomx_pckgs.Rdmpd' file in the 'static' directory.    
 
 Then run the following commands in the terminal or in RStudio. This will only install missing packages and dependencies.  
 
