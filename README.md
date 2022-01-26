@@ -23,7 +23,7 @@ R
 source("~/Downloads/histomx_pckgs.Rdmpd")
 ip <- as.data.frame(installed.packages())
 to_install <- setdiff(histomx_pckgs$package, ip$Package)
-install.packages(to_install)
+BiocManager::install(to_install) 
 
 quit(save="no")
 ```
