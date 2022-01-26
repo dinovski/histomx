@@ -427,8 +427,8 @@ POS_E counts should be > LoD
 Models have not been validated in clinical settings or trials. This report does not replace a standard diagnosis. Due to known technical variation, RNA later-fixed samples should be interpreted with caution.
 
 ```{r, echo=FALSE, include=TRUE}
-logoIMG='../static/multi-logos.png'
-#logoIMG='../static/ptg-logo.png'
+#logoIMG='../static/multi-logos.png'
+logoIMG='../static/ptg-logo.png'
 
 htmltools::img(src = knitr::image_uri(logoIMG), 
                alt = 'logo', 
