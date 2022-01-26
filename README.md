@@ -12,11 +12,10 @@ cd ~/Desktop
 
 3. Install all R packages and dependencies.  
 
-First, download the following file:  
-https://drive.google.com/file/d/1V89z4OYOJxdMUtL54jKeg5CrP-SIR32q/view?usp=sharing
+First, download the 'histomx_pckgs.Rdmpd' file in the 'static' folder.    
 
 Then run the following commands in the terminal or in RStudio. This will only install missing packages and dependencies.  
-NOTE: some packages may need to be installed from Bioconductor: eg.```BiocManager::install("DESeq2")```
+
 ```
 R
 
