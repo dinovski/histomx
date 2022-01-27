@@ -1,4 +1,4 @@
-si <-
+histomx_pckgs <-
 structure(list(package = c("archetypes", "Biobase", "BiocGenerics", 
 "BiocManager", "BiocParallel", "Biostrings", "cowplot", "DESeq2", 
 "dplyr", "EDASeq", "edgeR", "GenomeInfoDb", "GenomicAlignments", 
