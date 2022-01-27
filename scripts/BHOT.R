@@ -21,9 +21,7 @@ geoMean <- function(x) {
 }
 
 ##-------------------------------------------------
-## assess model accuracy
-## precision=PPV=predicted P that are P
-## recall=TPR=correctly classified P
+## output model performance metrics
 assessPrediction <- function(truth, predicted, print.results=TRUE) {
     predicted = predicted[ ! is.na(truth) ]
     truth = truth[ ! is.na(truth) ]
@@ -373,14 +371,14 @@ sampleStats <- function(tab) {
 
 ##------------------
 ## batch effects/outliers
-#ns.norm$batch.effects #output form nanostringnorm
+#ns.norm$batch.effects #output from nanostringnorm
 
 ##------------------
 ## Housekeeping gene QC and selection
 ## candidate housekeeping genes have a high mean and very low variance
 ## gene_annotations includes "CodeClass", "Name", "Accession"
 ## group_labels is optional
-hkQC <- function(raw_counts, gene_annotations, group_labels) {
+hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
     
     #hk_counts <- raw_counts[raw_counts$CodeClass=="Housekeeping",c("Name", samp_ids)]
     hk_genes <- gene_annotations[gene_annotations$CodeClass=="Housekeeping","Name"]
@@ -462,7 +460,7 @@ hkQC <- function(raw_counts, gene_annotations, group_labels) {
 ## (exc. ref genes to minimize pairwise variation)
 
 ## OPTION 1: nSolver
-NSnorm <- function(eset, background_correction, take_log) {
+NSnorm <- function(eset, background_correction=FALSE, take_log=TRUE) {
     
     ## 01 CodeCount normalization (adjust each sample based on relative value to all samples)
     #https://github.com/chrisrgc/NanoStringNorm/blob/master/R/code.count.normalization.R
@@ -548,9 +546,12 @@ NSnorm <- function(eset, background_correction, take_log) {
         x.norm <- log2(x.norm);
     }
     
-    ## TODO:additional norm
+    ## TODO:add additional normalization options
     #https://github.com/cran/NanoStringNorm/blob/master/R/other.normalization.quantile.R
     #https://github.com/cran/NanoStringNorm/blob/master/R/other.normalization.vsn.R
+    
+    ## endogenous genes only
+    #x.norm <- x.norm[rownames(x.norm) %in% ns_fdat[ns_fdat$CodeClass=="Endogenous","Name"]]
     
     return(x.norm)
 }
@@ -643,7 +644,7 @@ RCRnorm <- function(counts) {
 
 ##------------------
 ## Relative log expression plot (log2(expression/median across all assays))
-plotRLE <- function(counts, is_logged, main) {
+plotRLE <- function(counts, is_logged=TRUE, main=NULL) {
     
     x_endo <- counts[rownames(counts) %in% ns.counts[ns.counts$CodeClass=="Endogenous","Name"],]
     
@@ -680,11 +681,11 @@ plotRLE <- function(counts, is_logged, main) {
 ## feature selection: 10-50 genes
 
 ## Volcano plot
-plotVolcano <- function(df.fit, p_cutoff, num_genes=20, plot_title=NULL) {
+plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
     
     df.fit$gene <- rownames(df.fit)
     
-    ##DESeq2 outputs NA values for adjusted p values based on independent filtering of genes which have low counts
+    ## DESeq2 outputs NA values for adjusted p values based on independent filtering of genes that have low counts
     ## convert these to 1
     df.fit$padj<- ifelse(is.na(df.fit$padj), 1, df.fit$padj)
 
@@ -700,7 +701,7 @@ plotVolcano <- function(df.fit, p_cutoff, num_genes=20, plot_title=NULL) {
         #geom_point(data=df.fit, aes( x=log2FoldChange, y=logP), colour="slategray", size=3, alpha=0.7) +
         geom_point(data=df.fit, aes(x=log2FoldChange, y=logP, color=sig), shape=19, size=3, alpha=0.7) +
         geom_text_repel(data=head(df.fit, num_genes), aes(x=log2FoldChange, y=logP, label=gene), colour="gray", size=3) +
-        scale_color_manual(values=c("dodgerblue", "salmon")) + 
+        scale_color_manual(values=c("steelblue", "salmon")) + 
         geom_vline(xintercept=0, linetype="dashed", size=0.4) +
         geom_vline(xintercept=1, linetype="dashed", size=0.2) + geom_vline(xintercept=-1, size=0.2, linetype="dashed") +
         theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
@@ -712,7 +713,7 @@ plotVolcano <- function(df.fit, p_cutoff, num_genes=20, plot_title=NULL) {
               axis.title.y=element_text(size=12, family="sans", colour="black"))
     
     df.fit[df.fit$gene %in% c("CCL4", "CXCL11", "CXCL10", "PLA1A", "GNLY", "ROBO4", "FGFBP2",
-                              "SH2D1B", "CD160", "DARC", "ROBO4", "CDH5", "CDH13", "SOST"),] #ABMR
+                              "SH2D1B", "CD160", "DARC", "ROBO4", "CDH5", "CDH13", "SOST"),] #AMR
     
     df.fit[df.fit$gene %in% c("ADAMDEC1", "ANKRD22", "CTLA4", "IFNG", "ICOS", "BTLA", 
                               "CD96", "LAG3", "SIRPG", "LCP2", "DUSP2", "CD8A"),] #TCMR
@@ -845,4 +846,10 @@ runDESeq <- function(raw_counts, col_data, exp_design) {
     
     return(deseq.res.sig)
     
+}
+
+## Output data frame with all required packages
+package_dump <- function() {
+    si <- data.frame(sessioninfo::package_info(pkgs = c("attached")[1], include_base = FALSE, dependencies = NA))
+    dump("si","histomx_pckgs.Rdmpd")
 }

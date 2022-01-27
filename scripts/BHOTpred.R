@@ -87,7 +87,7 @@ refRCC <- refRCC[!basename(refRCC) %in% pedRCC[,1]]
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
 ##-----------------------------------------------------
-BHOTpred <- function(newRCC, outPath, saveFiles) {
+BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
   
     cat(">>Generating HistoMx molecular report...\n")
     cat("
@@ -101,11 +101,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
       O
      o-O
     o---O\n")
-  
-    ## if no option to save files, set to FALSE
-    if (!exists('saveFiles')) {
-      saveFiles="FALSE"
-    }
   
     ## if no output directory provided, output files to RCC file directory
     if (exists('outPath')) {
@@ -149,19 +144,39 @@ BHOTpred <- function(newRCC, outPath, saveFiles) {
     }
     
     ## keep only samples used in classifiers
-    ## TODO: eventually exclude unused files from final repo
+    ## TODO: eventually exclude unused RCC files from final repo
     countTable <- countTable[,colnames(countTable) %in% c("CodeClass", "Name", "Accession", rownames(mscores_ref), newID)]
-  
-    ## TODO: replace NanoStringNorm with manual normalization functions (see BHOT.R)
-    ns.norm <- NanoStringNorm::NanoStringNorm(
-              x = countTable,
-              CodeCount = 'geo.mean', #pos controls
-              Background = 'none', #mean.2sd
-              SampleContent = 'housekeeping.geo.mean', #housekeeping genes
-              round.values = FALSE, 
-              take.log = TRUE,
-              return.matrix.of.endogenous.probes=TRUE)
-  
+    
+    ##------------------------
+    ## normalization: no background correction
+    x <- countTable[,!colnames(countTable) %in% c("CodeClass", "Name", "Accession")]
+
+    ## 01 arithmetic mean of the geometric means of positive controls
+    posTab <- t(x[rownames(x) %in% countTable[countTable$CodeClass=="Positive","Name"],])
+    pos.sample <- apply(posTab, MARGIN=1, FUN=geoMean);
+    pos.norm.factors <- data.frame(ID=names(pos.sample), mean=mean(pos.sample) / pos.sample)
+    pos.norm.factors$mean <- round(pos.norm.factors$mean, 2)
+    rownames(pos.norm.factors) <- NULL
+    
+    ## multiply normalization factor by raw counts
+    x <- t(apply(x, MARGIN = 1, FUN = '*', pos.norm.factors$mean));
+
+    ## 02 SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
+    ## Normalize by substracting geometric mean of housekeeping genes from each endogenous gene
+    
+    hk_genes=countTable[countTable$CodeClass=="Housekeeping","Name"]
+    
+    ## calculate the normalization factor: arithmetic mean of the geometric means of positive controls
+    rna.content <- apply(x[rownames(x) %in% hk_genes,], MARGIN=2, FUN=geoMean);
+    hk.norm.factor <- mean(rna.content) / rna.content
+    
+    x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
+    x.norm <- log2(x.norm);
+    
+    ## return endogenous probes
+    ns.norm <- x.norm[rownames(x.norm) %in% countTable[countTable$CodeClass=="Endogenous","Name"],]
+    ##------------------------
+    
     ## TODO: prevent gene delimiter modification in model output
     rownames(ns.norm) <- gsub("-", ".", rownames(ns.norm))
     rownames(ns.norm) <- gsub("/", ".", rownames(ns.norm))
