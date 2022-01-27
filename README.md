@@ -51,7 +51,7 @@ mkdir -p $HISTOMX_PATH/refRCCs
 ```
 
 8. Download all reference RCC files:  
-https://drive.google.com/drive/folders/1Wzi9LCof7QMcYyx7kLOiKWuBFEY2o8Zk?usp=sharing
+https://drive.google.com/drive/folders/16MoE49JABUbHulXyG6ocZuCbIQnhYuqH?usp=sharing
 
 9. Move all RCC files to this directory:
 ```
