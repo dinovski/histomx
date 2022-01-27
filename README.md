@@ -10,26 +10,24 @@ https://cran.r-project.org/bin/macosx/
 cd ~/Desktop
 ```
 
-3. Install all R packages and dependencies.  
+3. Dowload the histomx code:  
+* Click the 'Code' button at the top of this repository and then 'Download ZIP'
+* Unzip and copy this directory ('histomx-main') to your working directory (eg. ~/Desktop)
 
-First, download the 'histomx_pckgs.Rdmpd' file in the 'static' directory.    
+4. Install all R packages and dependencies.  
 
-Then run the following commands in the terminal or in RStudio. This will only install missing packages and dependencies.  
+Run the following commands in the terminal or in RStudio. This will only install missing packages and dependencies.  
 
 ```
 R
 
-source("~/Downloads/histomx_pckgs.Rdmpd")
+source("~/Desktop/histomx-main/static/histomx_pckgs.Rdmpd")
 ip <- as.data.frame(installed.packages())
 to_install <- setdiff(histomx_pckgs$package, ip$Package)
 BiocManager::install(to_install) 
 
 quit(save="no")
 ```
-
-4. Dowload the histomx code:  
-* Click the 'Code' button at the top of this repository and then 'Download ZIP'
-* Unzip and copy this directory ('histomx-main') to your working directory (eg. ~/Desktop)
 
 5. In the terminal window, navigate to the histomx directory:
 ```
