@@ -3,7 +3,7 @@
 R must be installed on your machine. You can download it here:  
 https://cran.r-project.org/bin/macosx/
 
-NOTE: These instructions are for Mac only (it should theoreticall work in windows bash) 
+NOTE: These instructions are for Mac only (it should theoretically work in windows bash) 
 
 1. Open the 'Terminal' application on your computer.
 
