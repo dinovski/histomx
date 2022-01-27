@@ -3,6 +3,8 @@
 R must be installed on your machine. You can download it here:  
 https://cran.r-project.org/bin/macosx/
 
+NOTE: These instructions are for Mac only (it should theoreticall work in windows bash) 
+
 1. Open the 'Terminal' application on your computer.
 
 2. Change to wherever you want to use as your working directory:
@@ -29,12 +31,7 @@ BiocManager::install(to_install)
 quit(save="no")
 ```
 
-5. In the terminal window, navigate to the histomx directory:
-```
-cd ~/Desktop/histomx-main
-```
-
-6. Set variables to define paths to scripts/files
+5. Set variables to define paths to scripts/files
 ```
 HISTOMX_PATH=~/Desktop/histomx-main  
 
@@ -43,20 +40,20 @@ HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
 ```
 
-7. Create a directory called 'refRCCs'.
+6. Create a directory called 'refRCCs'.
 ```
 mkdir -p $HISTOMX_PATH/refRCCs
 ```
 
-8. Download all reference RCC files:  
+7. Download all reference RCC files:  
 https://drive.google.com/drive/folders/16MoE49JABUbHulXyG6ocZuCbIQnhYuqH?usp=sharing
 
-9. Move all RCC files to this directory:
+8. Move all RCC files to this directory:
 ```
 mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
 ```
 
-10. Run histomx on a single RCC file to generate the report
+9. Run histomx on a single RCC file to generate the report
 * This will output an .html file (you can specify the name of the file with the '-i' argument).
 * The -m (or --rmd) and -f (or --rcc) arguments are required
 
