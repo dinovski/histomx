@@ -104,10 +104,14 @@ rmarkdown::render('$RMD_FILE',
 
 echo "$RSCRIPT" | R --vanilla
 
+echo " "
 OUTPDF="${BASEDIR}/$(basename ${OUTPUT} .html).pdf"
-
+echo "To convert the html report to a pageless pdf, open the file in a web browser and export as a PDF."
+echo " "
 echo "To convert the html report to a paged pdf, run the following command:"
-echo "wkhtmltopdf --javascript-delay 1 $OUTPUT $OUTPDF"
-echo "To convert the html report to a pageless pdf, open the file in a web browser and export as a PDF"
+echo "wkhtmltopdf $OUTPUT $OUTPDF"
+echo "If the above is not working try running wkhtmltopdf with the following parameters:"
+echo "wkhtmltopdf --load-error-handling ignore --no-stop-slow-scripts --enable-local-file-access --encoding utf8 --javascript-delay 100 $OUTPUT $OUTPDF"
+
 
 
