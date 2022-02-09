@@ -131,7 +131,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## combine refset and new RCC into single count table
     RCCfiles <- c(refRCC, newRCC)
   
-    ns.data <- parseRCC(RCCfiles) ##takes awhile
+    ns.data <- parseRCC(RCCfiles)
   
     countTable <- ns.data$counts
     rownames(countTable) <- countTable$Name
@@ -171,7 +171,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     hk.norm.factor <- mean(rna.content) / rna.content
     
     x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
-    x.norm <- log2(x.norm);
+    x.norm <- log2(x.norm+0.1);
     
     ## return endogenous probes
     ns.norm <- x.norm[rownames(x.norm) %in% countTable[countTable$CodeClass=="Endogenous","Name"],]
@@ -199,10 +199,11 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
   
     ## calculate mean|median expression in refset normal biopsies
     ref_counts <- ns.norm[,colnames(ns.norm) %in% norm_bx_ids]
-    ref_counts <- data.frame(ref_median=apply(ref_counts, 1, median),
-                                ref_sd=apply(ref_counts, 1, sd))
+    ref_counts <- data.frame(ref_median=apply(ref_counts, 1, function(x) { median(x, na.rm=TRUE) }),
+                                ref_sd=apply(ref_counts, 1, function(x) { sd(x, na.rm=TRUE) }))
     ref_counts$gene <- rownames(ref_counts)
   
+    ## combine new and normal counts
     new_norm_counts <- merge(new_counts, ref_counts, by="gene")
     new_norm_counts$FC <- new_norm_counts$new_counts / new_norm_counts$ref_median
     new_norm_counts <- new_norm_counts[order(new_norm_counts$FC, decreasing=TRUE),]
