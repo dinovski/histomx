@@ -107,7 +107,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
       outPath=outPath
       cat("Output path:\n", outPath, "\n")
     } else {
-      outPath=dirname(newRCC)
+      outPath=paste0(dirname(newRCC), "/")
       cat("Output path:\n", outPath, "\n")
     }
   
@@ -280,17 +280,22 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
           pos_ct_df <- data.frame(table(positive_cell_types))
           colnames(pos_ct_df) <- c("CellType", "Count")
         
-          negative_cell_types <- bhot_cell_types[!bhot_cell_types %in% pos_ct_df$CellType]
-          neg_ct_df <- data.frame(CellType=negative_cell_types, Count=0, check.names=FALSE)
-          
           ## Add total endothelial associated gene count
           num_endats <- data.frame(CellType='Endothelial', Count=sum(ifelse(new_top_genes$gene %in% endats, 1, 0)), check.names=FALSE)
-        
-          cell_type_table <- rbind(pos_ct_df, neg_ct_df, num_endats)
-          cell_type_table <- cell_type_table[order(cell_type_table$Count, decreasing=TRUE),]
+          pos_ct_df <- rbind(pos_ct_df, num_endats)
           
+          ## if cell types not enriched, output empty counts for these cell types
+          negative_cell_types <- bhot_cell_types[!bhot_cell_types %in% pos_ct_df$CellType]
+          if (length(negative_cell_types) > 0) {
+            neg_ct_df <- data.frame(CellType=negative_cell_types, Count=0, check.names=FALSE)
+            cell_type_table <- rbind(pos_ct_df, neg_ct_df)
+          } else {
+            cell_type_table <- pos_ct_df
+            cell_type_table <- cell_type_table[order(cell_type_table$Count, decreasing=TRUE),]
+          }
+
         } else {
-        
+          ## no enriched cell types
           cell_type_table <- data.frame(CellType=c(bhot_cell_types, "Endothelial"), Count=0, check.names=FALSE)
         }
       
