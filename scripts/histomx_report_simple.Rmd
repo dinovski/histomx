@@ -14,13 +14,6 @@ params:
   patient_file: ''
 ---
 
-```{r, include=FALSE, eval=FALSE}
-## to run manually
-rmarkdown::render('./scripts/histomx_report.Rmd')
-## convert output html to paged PDF 
-system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
-```
-
 ```{r setup, include=FALSE, echo=FALSE}
 options(rgl.useNULL=TRUE)
 ## set paths in all code chunks are relative to this root.dir
@@ -40,7 +33,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ***
 ## Molecular Pathology Platform
-> **Team leader:** Pr Alexandre Loupy MD/PhD  
+> **Team leader:** Pr Alexandre Loupy MD/PhD   
 **Project managers:** Fariza Mezine & Blaise Robin  
 **Bioinformatician:** Dina Zielinski PhD
 **Clinical reviewer:** Valentin Goutaudier MD  
@@ -120,11 +113,11 @@ if(nrow(pt_df) %% 2 == 0) {
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "ATI", "IFTA")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA")]))
 ## exclude 'normal' molecular score
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "ATI", "normal", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "normal", "IFTA", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 #tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -154,10 +147,6 @@ tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" &
 # tab[rownames(tab)=="TCMR","ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
-
-## reference biopsy ATI molecular score ranges
-tab[rownames(tab)=="ATI","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","ATI"]
-tab[rownames(tab)=="ATI","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","ATI"]
 
 ## reference biopsy IFTA molecular score ranges
 tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
@@ -202,7 +191,7 @@ ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
 colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
-                   "ATI Q1", "ATI Q3", "IFTA Q1", "IFTA Q3",
+                   "IFTA Q1", "IFTA Q3",
                    "No lesion Q1", "No lesion Q3")
 rownames(tab) <- rownames(ms_new)
 
@@ -213,8 +202,6 @@ for(i in 1:nrow(tab)) {
   tab[rownames(tab)==rownames(ms_new)[i],"AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"ATI Q1"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="25%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"IFTA Q1"] <- ms_ref[ms_ref$Dx=="IFTA" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"IFTA Q3"] <- ms_ref[ms_ref$Dx=="IFTA" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%",rownames(ms_new)[i]]
@@ -224,7 +211,6 @@ for(i in 1:nrow(tab)) {
 #tab <- tab[!is.na(colnames(tab))]
 tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
 tab$'TCMR range' <- paste(tab$`TCMR Q1`, "-", tab$`TCMR Q3`)
-tab$'ATI range' <- paste(tab$`ATI Q1`, "-", tab$`ATI Q3`)
 tab$'IFTA range' <- paste(tab$`IFTA Q1`, "-", tab$`IFTA Q3`)
 tab$'Normal range' <- paste(tab$`No lesion Q1`, "-", tab$`No lesion Q3`)
 tab$'Banff lesion' <- gsub("_", " ", rownames(tab))
@@ -287,51 +273,6 @@ newPreds$knn <- newPreds$knn[,c("Dx", "Total", "Percent")]
 kable(newPreds$knn, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(c(1,2,3), bold=TRUE, background="white")
 ```
-&nbsp;  
-
-\newpage
-***
-### Pathway analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the # of enriched genes; GeneRatio=the % of total genes associated with the pathway).'}
-
-#gridExtra::grid.arrange(newPreds$cell_type_radar, newPreds$pathway_radar, ncol=2, nrow=1)
-
-newPreds$pathway_radar
-
-# pw_df <- newPreds$pathways
-# pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
-# kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
-#           row_spec(1:nrow(pw_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-```
-
-***
-### Cell type analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed cell type.'}
-
-newPreds$cell_type_radar
-
-# ct_df <- newPreds$cell_types
-# ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
-# kable(ct_df, row.names=FALSE, col.names=rep("", ncol(ct_df)), align='c', format="html") %>%
-#           row_spec(1:nrow(ct_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-```
-
-***
-### Clinician signout
-```{r, echo=FALSE, warning=FALSE, include=TRUE}
-sign_df <- data.frame(Name=">", Signature="")
-
-kable(sign_df, align='c', format="html") %>% kableExtra::kable_styling(position="center") %>%
-  row_spec(1, background="white", align='l')
-```
-> **_Comments:_**  
->  &nbsp;    
->  &nbsp;  
->  &nbsp;  
->  &nbsp;    
->  &nbsp;  
 
 \newpage
 
