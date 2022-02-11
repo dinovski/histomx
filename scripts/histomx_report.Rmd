@@ -41,7 +41,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ***
 ## Molecular Pathology Platform
 > **Team leader:** Pr Alexandre Loupy
-**Project manager:** Blaise Robin  
+**Project managers:** Fariza Mezine & Blaise Robin  
 **Bioinformatician:** Dina Zielinski PhD
 **Clinical reviewer:** Valentin Goutaudier MD  
 **Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85  
