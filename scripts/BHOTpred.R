@@ -171,7 +171,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     hk.norm.factor <- mean(rna.content) / rna.content
     
     x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
-    x.norm <- log2(x.norm+0.1);
+    x.norm <- log2(x.norm + 1);
     
     ## return endogenous probes
     ns.norm <- x.norm[rownames(x.norm) %in% countTable[countTable$CodeClass=="Endogenous","Name"],]
