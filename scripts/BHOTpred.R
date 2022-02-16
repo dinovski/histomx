@@ -18,6 +18,7 @@ g0_score.model <- get(load(paste0(modelPath, 'g0_score_model.RData')))
 ptc0_score.model <- get(load(paste0(modelPath, 'ptc0_score_model.RData')))
 cg0_score.model <- get(load(paste0(modelPath, 'cg0_score_model.RData')))
 v0_score.model <- get(load(paste0(modelPath, 'v0_score_model.RData')))
+iifta0_score.model <- get(load(paste0(modelPath, 'iifta0_score_model.RData')))
 i1_score.model <- get(load(paste0(modelPath, 'i1_score_model.RData')))
 t1_score.model <- get(load(paste0(modelPath, 't1_score_model.RData')))
 ci1_score.model <- get(load(paste0(modelPath, 'ci1_score_model.RData')))
@@ -83,6 +84,8 @@ refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE
 pedRCC <- read.table('../static/ped_rcc_ids.txt', header=FALSE)
 
 refRCC <- refRCC[!basename(refRCC) %in% pedRCC[,1]]
+
+#newRCC='../test_files/test.RCC'
 
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
@@ -412,34 +415,33 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     
     ##-----------------
     ## enrichment plots
-    pathway_table$GeneRatio[pathway_table$GeneRatio==0]<-0.001 ## add small value to display non-enriched pathways
-    pathway_table$Pathway <- factor(pathway_table$Pathway, levels=pathway_table$Pathway[order(pathway_table$GeneRatio)])
-    
-    pathway_plot <- ggplot(pathway_table, aes(x=Pathway, y=GeneRatio, fill=qval)) +
-      geom_bar(stat = "identity") + xlab("") + coord_flip() + 
-      scale_colour_gradient2(limits = c(0, 1)) +
-      theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
-            panel.background=element_blank(), axis.line=element_line(colour="black"),
-            panel.border=element_rect(colour="black", fill=NA, size=1),
-            plot.title = element_text(size=12, face = "bold"),
-            axis.text=element_text(size=12, family="sans", colour="black"), 
-            axis.title.x=element_text(size=12, family="sans", colour="black"), 
-            axis.title.y=element_text(size=12, family="sans", colour="black"))
-    
-    ## enrichment plots
-    cell_type_table$GeneRatio[cell_type_table$GeneRatio==0]<-0.001 ## add small value to display non-enriched pathways
-    cell_type_table$CellType <- factor(cell_type_table$CellType, levels=cell_type_table$CellType[order(cell_type_table$GeneRatio)])
-    
-    cell_type_plot <- ggplot(cell_type_table, aes(x=CellType, y=GeneRatio, fill=qval)) +
-      geom_bar(stat = "identity") + xlab("") + coord_flip() +
-      scale_colour_gradient2(limits = c(0, 1)) +
-      theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
-            panel.background=element_blank(), axis.line=element_line(colour="black"),
-            panel.border=element_rect(colour="black", fill=NA, size=1),
-            plot.title = element_text(size=12, face = "bold"),
-            axis.text=element_text(size=12, family="sans", colour="black"), 
-            axis.title.x=element_text(size=12, family="sans", colour="black"), 
-            axis.title.y=element_text(size=12, family="sans", colour="black"))
+    # pathway_table$GeneRatio[pathway_table$GeneRatio==0]<-0.001 ## add small value to display non-enriched pathways
+    # pathway_table$Pathway <- factor(pathway_table$Pathway, levels=pathway_table$Pathway[order(pathway_table$GeneRatio)])
+    # 
+    # pathway_plot <- ggplot(pathway_table, aes(x=Pathway, y=GeneRatio, fill=qval)) +
+    #   geom_bar(stat = "identity") + xlab("") + coord_flip() + 
+    #   scale_colour_gradient2(limits = c(0, 1)) +
+    #   theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
+    #         panel.background=element_blank(), axis.line=element_line(colour="black"),
+    #         panel.border=element_rect(colour="black", fill=NA, size=1),
+    #         plot.title = element_text(size=12, face = "bold"),
+    #         axis.text=element_text(size=12, family="sans", colour="black"), 
+    #         axis.title.x=element_text(size=12, family="sans", colour="black"), 
+    #         axis.title.y=element_text(size=12, family="sans", colour="black"))
+    # 
+    # cell_type_table$GeneRatio[cell_type_table$GeneRatio==0]<-0.001 ## add small value to display non-enriched pathways
+    # cell_type_table$CellType <- factor(cell_type_table$CellType, levels=cell_type_table$CellType[order(cell_type_table$GeneRatio)])
+    # 
+    # cell_type_plot <- ggplot(cell_type_table, aes(x=CellType, y=GeneRatio, fill=qval)) +
+    #   geom_bar(stat = "identity") + xlab("") + coord_flip() +
+    #   scale_colour_gradient2(limits = c(0, 1)) +
+    #   theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
+    #         panel.background=element_blank(), axis.line=element_line(colour="black"),
+    #         panel.border=element_rect(colour="black", fill=NA, size=1),
+    #         plot.title = element_text(size=12, face = "bold"),
+    #         axis.text=element_text(size=12, family="sans", colour="black"), 
+    #         axis.title.x=element_text(size=12, family="sans", colour="black"), 
+    #         axis.title.y=element_text(size=12, family="sans", colour="black"))
     
     ##--------------------------
     ## predict Dx/Banff score probabilities
@@ -699,13 +701,31 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     new.cg0.pred <- new.pred
     colnames(new.cg0.pred) <- c("cg0_score", "ID")
   
+    ##--------------------------
+    ## predict prob i_IFTA>0 for new samples
+    #iifta0.genes <- rownames(cg0_score.model$scaling) #LDA
+    iifta0.genes <- names(iifta0_score.model$coefficients)[-1] #LR
+    
+    new.ge <- new.ns.norm
+    new.ge <- t(new.ge)
+    new.ge <- new.ge[,colnames(new.ge) %in% iifta0.genes]
+    
+    #new.pred <- predict(iifta0_score.model, newdata=new.ge, type="prob")$posterior
+    new.pred <- predict(iifta0_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
+    
+    new.pred <- data.frame(new.pred)
+    new.pred$ID <- newID
+    new.pred$low <- NULL
+    new.iifta0.pred <- new.pred
+    colnames(new.iifta0.pred) <- c("iifta0_score", "ID")
+    
     ##-------------------------------------
     ## score table
     options(scipen = 999)
     join_list <- list(new.normal.pred, new.amr.pred, new.tcmr.pred,
                       new.ati.pred, new.ifta.pred,
                       new.g0.pred, new.ptc0.pred, new.cg0.pred,
-                      new.i1.pred, new.t1.pred, new.v0.pred,
+                      new.i1.pred, new.t1.pred, new.iifta0.pred, new.v0.pred,
                       new.cv1.pred, new.ci1.pred, new.ct1.pred)
     tab <- Reduce(function(...) merge(..., all=TRUE), join_list)
     rownames(tab) <- tab$ID
@@ -732,7 +752,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## output IQR and median scores by Dx for reference biopsies
     scores_keep <- c("AMR", "TCMR", "ATI", "IFTA", "normal",
                    "g0_score", "ptc0_score", "cg0_score",
-                   "i1_score", "t1_score", "v0_score",
+                   "i1_score", "t1_score", "iifta0_score", "v0_score",
                    "ci1_score", "ct1_score", "cv1_score")
   
     ref.tab <- mscores_ref ## complete Dx + molecular scores
@@ -1040,68 +1060,64 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #write.table(nn_dx, file=paste0(newOut, "/knn_", newID, "_", Sys.Date(), ".txt"), row.names=T, quote=F, sep='\t')
   
     ##-----------------------------
-    ## archetypal analysis
+    ## archetypal analysis: predict archetypes on unseen molecular scores
     ##-----------------------------
     ## import cluster assignment for ref biopsies
-    mscores_aa <- read.table(mscores_aa_file, header=TRUE, sep='\t')
-  
-    ## predict archetypes on unseen molecular scores
-    mscores_new <- dplyr::rename(mscores_new, amr=AMR)
-    mscores_new <- dplyr::rename(mscores_new, tcmr=TCMR)
-    mscores_new <- dplyr::rename(mscores_new, ifta=IFTA)
-    mscores_new <- dplyr::rename(mscores_new, ati=ATI)
-    
-    pred_aa <- data.frame(predict(aa_model, mscores_new[,colnames(aa_model$archetypes)]))
-    rownames(pred_aa) <- newID
-    mscores_new$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
-    mscores_new$Dx <- "new"
-
-    mscores_aa_all <- rbind(mscores_aa, mscores_new[,colnames(mscores_aa)])
-  
-    pca.aa <- merge(pca.df, mscores_aa_all[,c("ID", "aa_cluster")], by="ID")
-    pca.aa$aa_cluster <- as.factor(pca.aa$aa_cluster)
-  
-    pca.aa[pca.aa$ref=="new",]
-  
-    aa_cols=c("black", "firebrick", "gray80", "#009E73", "firebrick")
-  
-    pca_aa <- ggplot() +
-        scale_fill_manual(values=aa_cols) +
-        #geom_point(data=pca.aa, aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
-        geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
-        geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
-        #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=4, colour="orange") +
-        xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
-        ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-        theme(legend.position="top", legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
-              panel.background=element_blank(), 
-              axis.line=element_line(colour="white"),
-              axis.text=element_text(size=12), 
-              axis.text.x=element_text(size=12, angle=0),
-              axis.title.x=element_text(face="bold", size=12, angle=0), 
-              axis.title.y=element_text(face="bold", size=12),  
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #if (saveFiles=="TRUE") {
-    #  ggsave(paste0(newOut, "/pca_archetypes_pc1_2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_aa, device="pdf", width=7, height=6)
-    #}
-  
-    pca_aa_2_3 <- ggplot() +
-        scale_fill_manual(values=aa_cols) +
-        geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.2, Dim.3, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
-        geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=3, alpha=1, fill="orange") +
-        #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3, label=ID), size=3, colour="orange") +
-        xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-        ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
-        theme(legend.position="top", legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
-              panel.background=element_blank(), 
-              axis.line=element_line(colour="white"),
-              axis.text=element_text(size=12), 
-              axis.text.x=element_text(size=12, angle=0),
-              axis.title.x=element_text(face="bold", size=12, angle=0), 
-              axis.title.y=element_text(face="bold", size=12),  
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+    # mscores_aa <- read.table(mscores_aa_file, header=TRUE, sep='\t')
+    # 
+    # mscores_new <- dplyr::rename(mscores_new, amr=AMR)
+    # mscores_new <- dplyr::rename(mscores_new, tcmr=TCMR)
+    # mscores_new <- dplyr::rename(mscores_new, ifta=IFTA)
+    # mscores_new <- dplyr::rename(mscores_new, ati=ATI)
+    # 
+    # pred_aa <- data.frame(predict(aa_model, mscores_new[,colnames(aa_model$archetypes)]))
+    # rownames(pred_aa) <- newID
+    # mscores_new$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
+    # mscores_new$Dx <- "new"
+    # 
+    # mscores_aa_all <- rbind(mscores_aa, mscores_new[,colnames(mscores_aa)])
+    # 
+    # pca.aa <- merge(pca.df, mscores_aa_all[,c("ID", "aa_cluster")], by="ID")
+    # pca.aa$aa_cluster <- as.factor(pca.aa$aa_cluster)
+    # 
+    # pca.aa[pca.aa$ref=="new",]
+    # 
+    # aa_cols=c("black", "firebrick", "gray80", "#009E73", "firebrick")
+    # 
+    # pca_aa <- ggplot() +
+    #     scale_fill_manual(values=aa_cols) +
+    #     #geom_point(data=pca.aa, aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
+    #     geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
+    #     geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
+    #     #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=4, colour="orange") +
+    #     xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
+    #     ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
+    #     theme(legend.position="top", legend.title=element_blank(),
+    #           panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
+    #           panel.background=element_blank(), 
+    #           axis.line=element_line(colour="white"),
+    #           axis.text=element_text(size=12), 
+    #           axis.text.x=element_text(size=12, angle=0),
+    #           axis.title.x=element_text(face="bold", size=12, angle=0), 
+    #           axis.title.y=element_text(face="bold", size=12),  
+    #           panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+    # 
+    # pca_aa_2_3 <- ggplot() +
+    #     scale_fill_manual(values=aa_cols) +
+    #     geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.2, Dim.3, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) + 
+    #     geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=3, alpha=1, fill="orange") +
+    #     #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3, label=ID), size=3, colour="orange") +
+    #     xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
+    #     ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
+    #     theme(legend.position="top", legend.title=element_blank(),
+    #           panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
+    #           panel.background=element_blank(), 
+    #           axis.line=element_line(colour="white"),
+    #           axis.text=element_text(size=12), 
+    #           axis.text.x=element_text(size=12, angle=0),
+    #           axis.title.x=element_text(face="bold", size=12, angle=0), 
+    #           axis.title.y=element_text(face="bold", size=12),  
+    #           panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
     #if (saveFiles=="TRUE") {
       #ggsave(paste0(newOut, "/pca_archetypes_pc2_3_", newID, "_", Sys.Date(), ".pdf"), plot=last_plot(), device="pdf", width=7, height=6)
     #}
@@ -1109,44 +1125,43 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##---------------
     ## Dx by cluster
     ## banff score by cluster
-    aa.df <- pca.aa[,c("ID", "aa_cluster", "Dx")]
-    #aa.df <- aa.df[aa.df$Dx!="new",]
-  
-    aa.1.df <- droplevels(aa.df[aa.df$aa_cluster=="1",])
-    aa.2.df <- droplevels(aa.df[aa.df$aa_cluster=="2",])
-    aa.3.df <- droplevels(aa.df[aa.df$aa_cluster=="3",])
-    aa.4.df <- droplevels(aa.df[aa.df$aa_cluster=="4",])
-    aa.5.df <- droplevels(aa.df[aa.df$aa_cluster=="5",])
-    #aa.6.df <- droplevels(aa.df[aa.df$aa_cluster=="6",])
-    
-    ## Dx by cluster
-    k1.df <- data.frame(table(aa.1.df$Dx))
-    k1.df$k <- "1"
-    colnames(k1.df) <- c("Dx", "total", "cluster")
-  
-    k2.df <- data.frame(k2=table(aa.2.df$Dx))
-    k2.df$k <- "2"
-    colnames(k2.df) <- c("Dx", "total", "cluster")
-  
-    k3.df <- data.frame(k3=table(aa.3.df$Dx))
-    k3.df$k <- "3"
-    colnames(k3.df) <- c("Dx", "total", "cluster")
-  
-    k4.df <- data.frame(k4=table(aa.4.df$Dx))
-    k4.df$k <- "4"
-    colnames(k4.df) <- c("Dx", "total", "cluster")
-    
-    k5.df <- data.frame(k5=table(aa.5.df$Dx))
-    k5.df$k <- "5"
-    colnames(k5.df) <- c("Dx", "total", "cluster")
-  
-    #k6.df <- data.frame(k6=table(aa.6.df$Dx))
-    #k6.df$k <- "6"
-    #colnames(k6.df) <- c("Dx", "total", "cluster")
-    
-    ## Dx by cluster
-    cluster_table <- dplyr::bind_rows(k1.df, k2.df, k3.df, k4.df, k5.df)
-  
+    # aa.df <- pca.aa[,c("ID", "aa_cluster", "Dx")]
+    # #aa.df <- aa.df[aa.df$Dx!="new",]
+    # 
+    # aa.1.df <- droplevels(aa.df[aa.df$aa_cluster=="1",])
+    # aa.2.df <- droplevels(aa.df[aa.df$aa_cluster=="2",])
+    # aa.3.df <- droplevels(aa.df[aa.df$aa_cluster=="3",])
+    # aa.4.df <- droplevels(aa.df[aa.df$aa_cluster=="4",])
+    # aa.5.df <- droplevels(aa.df[aa.df$aa_cluster=="5",])
+    # aa.6.df <- droplevels(aa.df[aa.df$aa_cluster=="6",])
+    # 
+    # ## Dx by cluster
+    # k1.df <- data.frame(table(aa.1.df$Dx))
+    # k1.df$k <- "1"
+    # colnames(k1.df) <- c("Dx", "total", "cluster")
+    # 
+    # k2.df <- data.frame(k2=table(aa.2.df$Dx))
+    # k2.df$k <- "2"
+    # colnames(k2.df) <- c("Dx", "total", "cluster")
+    # 
+    # k3.df <- data.frame(k3=table(aa.3.df$Dx))
+    # k3.df$k <- "3"
+    # colnames(k3.df) <- c("Dx", "total", "cluster")
+    # 
+    # k4.df <- data.frame(k4=table(aa.4.df$Dx))
+    # k4.df$k <- "4"
+    # colnames(k4.df) <- c("Dx", "total", "cluster")
+    # 
+    # k5.df <- data.frame(k5=table(aa.5.df$Dx))
+    # k5.df$k <- "5"
+    # colnames(k5.df) <- c("Dx", "total", "cluster")
+    # 
+    # k6.df <- data.frame(k6=table(aa.6.df$Dx))
+    # k6.df$k <- "6"
+    # colnames(k6.df) <- c("Dx", "total", "cluster")
+    # 
+    # ## Dx by cluster
+    # cluster_table <- dplyr::bind_rows(k1.df, k2.df, k3.df, k4.df, k5.df, k6.df)
     #write.table(cluster_table, file=paste0(newOut, "/aa_cluster_", newID, "_", Sys.Date(), ".txt"), row.names=F, quote=F, sep='\t')
   
     ##-------------------------------------------
@@ -1154,16 +1169,16 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     return(list(score_table=mscores_new_pct,
               ref_scores=ref.score.quantiles,
               knn=nn_dx,
-              aa_cluster_table=cluster_table,
-              aa_cluster_new=pred_aa, #new sample cluster probs
+              #aa_cluster_table=cluster_table,
+              #aa_cluster_new=pred_aa, #new sample cluster probs
               pca_1_2=pca_new_1_2,
               pca_2_3=pca_new_2_3,
-              pca_archetype=pca_aa,
+              #pca_archetype=pca_aa,
               pathways=pathway_table,
-              pathway_plot=pathway_plot,
+              #pathway_plot=pathway_plot,
               pathway_radar=pathway_radar,
               cell_types=cell_type_table,
-              cell_type_plot=cell_type_plot,
+              #cell_type_plot=cell_type_plot,
               cell_type_radar=cell_type_radar)
           )
   

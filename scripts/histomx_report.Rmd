@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.3"
+title: "&nbsp;v1.4"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -187,17 +187,17 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
 
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, acute TCMR, chronic active TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
 
 \newpage
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## table of molecular scores
-ms_new <- data.frame(t(newPreds$score_table[,c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "cv1_score", "ci1_score", "ct1_score")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score")]))
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
