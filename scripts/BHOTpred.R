@@ -144,7 +144,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     }
     
     ## keep only samples used in classifiers
-    ## TODO: eventually exclude unused RCC files from final repo
+    ## eventually exclude unused RCC files from final repo
     countTable <- countTable[,colnames(countTable) %in% c("CodeClass", "Name", "Accession", rownames(mscores_ref), newID)]
     
     ##------------------------
@@ -313,23 +313,28 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##-------------
     ## Radar plot: pathways
     pathway_radar <- ggplot(pathway_table) +
-      # add custom panel grid
-      geom_hline(aes(yintercept = y), data.frame(y = c(0:max(pathway_table$GeneRatio)) ), color = "white") + 
-      # add bars to represent the cumulative track lengths
-      geom_col(aes(x = reorder(str_wrap(Pathway, 7), GeneRatio), y = GeneRatio, fill = GeneRatio),
+      ## add custom panel grid: up to 100 or max generatio in sample
+      #geom_hline(aes(yintercept = y), data.frame(y = c(0:max(pathway_table$GeneRatio)) ), color="white") + 
+      geom_hline(aes(yintercept = y), data.frame(y = c(0:100) ), color="white") +
+      ## add bars to represent the cumulative track lengths
+      geom_col(aes(x = reorder(str_wrap(Pathway, 7), GeneRatio), y=GeneRatio, fill=GeneRatio),
                position = "dodge2", show.legend = TRUE, alpha = .9) +
       # line for GeneRatio per pathway
       geom_segment(aes(x = reorder(str_wrap(Pathway, 7), GeneRatio), y = 0,
                        xend = reorder(str_wrap(Pathway, 7), GeneRatio),
-                       yend = max(GeneRatio)), linetype = "dashed", color = "navy") + 
-      # Add dots to represent the count
+                       yend = 100), linetype = "dashed", color = "navy") +
+                       #yend = max(GeneRatio)), linetype = "dashed", color = "navy") + 
+      ## Add dots to represent the count
       geom_point(aes(x=reorder(str_wrap(Pathway, 7), Count), y = Count), size = 3, color = "navy") +
       geom_text_repel(data=pathway_table[pathway_table$Count>0,], ## add count for pathways with count>0
                       aes(x=reorder(str_wrap(Pathway, 7), Count), y = Count, label=Count), size=3, colour="navy") +
       coord_polar(clip="off") +
-      # Scale y axis so bars don't start in the center
+      ## Scale y axis so bars don't start in the center
       #scale_y_continuous(limits = c(-10, max(pathway_table$Total)),expand = c(0, 0), breaks = c(0, 5, 10, 20)) + 
       #scale_fill_gradientn("Number of genes", colours = c( "#6C5B7B","#C06C84","#F67280","#F8B195"))
+      #scale_fill_gradient(low="lightblue", high="darkblue", limits=c(0,100)) +
+      #scale_fill_gradientn(colours=brewer.pal(4, "Blues"), limits=c(0,100)) +
+      scale_fill_gradientn(colours=c("#EFF3FF", "#BDD7E7", "#6BAED6", "darkblue"), limits=c(0,100)) +
       theme(axis.title = element_blank(),
             axis.ticks = element_blank(),
             axis.text.y = element_blank(),
@@ -339,13 +344,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
             #panel.grid.minor=element_line(colour="gray"),
             panel.grid.major=element_line(colour="gray"),
             panel.border=element_rect(colour=NA, fill=NA, size=5),
-            legend.title = element_text(size=10),
+            legend.title = element_blank(),
             legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
             legend.position="right")
     
     ## Radar plot: cell types
     cell_type_radar <- ggplot(cell_type_table) +
-      geom_hline(aes(yintercept = y), data.frame(y = c(0:max(pathway_table$GeneRatio)) ), color = "white") + 
+      geom_hline(aes(yintercept = y), data.frame(y = c(0:100) ), color = "white") + 
       geom_col(aes(x = reorder(str_wrap(CellType, 7), GeneRatio), y = GeneRatio, fill = GeneRatio),
                position = "dodge2", show.legend = TRUE, alpha = .9) +
       geom_segment(aes(x = reorder(str_wrap(CellType, 7), GeneRatio), y = 0,
@@ -359,6 +364,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
       # Scale y axis so bars don't start in the center
       #scale_y_continuous(limits = c(-10, max(pathway_table$Total)),expand = c(0, 0), breaks = c(0, 5, 10, 20)) + 
       #scale_fill_gradientn("Number of genes", colours = c( "#6C5B7B","#C06C84","#F67280","#F8B195"))
+      scale_fill_gradientn(colours=c("#EFF3FF", "#BDD7E7", "#6BAED6", "darkblue"), limits=c(0,100)) +
       theme(axis.title = element_blank(),
             axis.ticks = element_blank(),
             axis.text.y = element_blank(),
@@ -368,7 +374,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
             #panel.grid.minor=element_line(colour="gray"),
             panel.grid.major=element_line(colour="gray"),
             panel.border=element_rect(colour=NA, fill=NA, size=5),
-            legend.title = element_text(size=10),
+            legend.title = element_blank(),
             legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
             legend.position="right")
     
