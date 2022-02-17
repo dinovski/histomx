@@ -39,6 +39,14 @@ HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
 ```
+NOTE: to generate a simplified report without pathways, simply set the RMD_FILE to:
+```
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report_simple.Rmd
+```
+And to show acute v. chronic active TCMR scores:
+```
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report_tcmr.Rmd
+```
 
 6. Create a directory called 'refRCCs'.
 ```
