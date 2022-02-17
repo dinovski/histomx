@@ -12,6 +12,8 @@ aa_model <- get(load(paste0(modelPath, 'aa_model.rda')))
 normal.model <- get(load(paste0(modelPath, 'normal_model.RData')))
 amr.model <- get(load(paste0(modelPath, 'amr_model.RData')))
 tcmr.model <- get(load(paste0(modelPath, 'tcmr_model.RData')))
+atcmr.model <- get(load(paste0(modelPath, 'atcmr_model.RData')))
+catcmr.model <- get(load(paste0(modelPath, 'catcmr_model.RData')))
 ati.model <- get(load(paste0(modelPath, 'ati_model.RData')))
 ifta.model <- get(load(paste0(modelPath, 'ifta_model.RData')))
 g0_score.model <- get(load(paste0(modelPath, 'g0_score_model.RData')))
@@ -39,7 +41,7 @@ colnames(mscores_ref)[colnames(mscores_ref)=="ati"]<-"ATI"
 colnames(mscores_ref)[colnames(mscores_ref)=="ifta"]<-"IFTA"
 
 ## Define histology diagnosis categories
-dx_normal <- c("Normal or minimal changes", "Pristine")
+dx_normal <- c("Normal or minimal changes", "Pristine", "No specific diagnosis")
 dx_amr <- c("Active AMR", "Chronic (+/- active) AMR")
 dx_tcmr <- c("Acute TCMR", "Chronic active TCMR")
 dx_ati <- c("Acute tubular injury")
@@ -498,7 +500,43 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     new.tcmr.pred$ID <- newID
     #new.tcmr.pred$other <- NULL #LDA
     colnames(new.tcmr.pred)<-c("tcmr", "ID")
+    
+    ##--------------------------
+    ## predict acute TCMR prob for new sample(s)
+    #atcmr.genes <- rownames(atcmr.model$scaling) #LDA
+    atcmr.genes <- names(atcmr.model$coefficients)[-1] #LR
+    
+    new.ge <- new.ns.norm
+    new.ge <- t(new.ge)
+    new.ge <- new.ge[,colnames(new.ge) %in% atcmr.genes]
+    
+    #new.atcmr.pred <- predict(atcmr.model, newdata=new.ge, type="prob")$posterior #LDA
+    new.atcmr.pred <- predict(atcmr.model, newdata=data.frame(t(new.ge)), type="response")
+    
+    new.atcmr.pred <- data.frame(new.atcmr.pred)
+    #new.atcmr.pred$ID <- rownames(new.atcmr.pred)
+    new.atcmr.pred$ID <- newID
+    #new.atcmr.pred$other <- NULL #LDA
+    colnames(new.atcmr.pred)<-c("atcmr", "ID")
   
+    ##--------------------------
+    ## predict acute TCMR prob for new sample(s)
+    #catcmr.genes <- rownames(catcmr.model$scaling) #LDA
+    catcmr.genes <- names(catcmr.model$coefficients)[-1] #LR
+    
+    new.ge <- new.ns.norm
+    new.ge <- t(new.ge)
+    new.ge <- new.ge[,colnames(new.ge) %in% catcmr.genes]
+    
+    #new.catcmr.pred <- predict(catcmr.model, newdata=new.ge, type="prob")$posterior #LDA
+    new.catcmr.pred <- predict(catcmr.model, newdata=data.frame(t(new.ge)), type="response")
+    
+    new.catcmr.pred <- data.frame(new.catcmr.pred)
+    #new.catcmr.pred$ID <- rownames(new.catcmr.pred)
+    new.catcmr.pred$ID <- newID
+    #new.catcmr.pred$other <- NULL #LDA
+    colnames(new.catcmr.pred)<-c("catcmr", "ID")
+    
     ##--------------------------
     ## predict ATI prob for new sample(s)
     #ati.genes <- rownames(ati.model$scaling) #LDA
@@ -723,6 +761,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## score table
     options(scipen = 999)
     join_list <- list(new.normal.pred, new.amr.pred, new.tcmr.pred,
+                      new.atcmr.pred, new.catcmr.pred,
                       new.ati.pred, new.ifta.pred,
                       new.g0.pred, new.ptc0.pred, new.cg0.pred,
                       new.i1.pred, new.t1.pred, new.iifta0.pred, new.v0.pred,
@@ -732,6 +771,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
   
     colnames(tab)[colnames(tab)=="amr"]<-"AMR"
     colnames(tab)[colnames(tab)=="tcmr"]<-"TCMR"
+    colnames(tab)[colnames(tab)=="atcmr"]<-"aTCMR"
+    colnames(tab)[colnames(tab)=="catcmr"]<-"caTCMR"
     colnames(tab)[colnames(tab)=="ati"]<-"ATI"
     colnames(tab)[colnames(tab)=="ifta"]<-"IFTA"
   
@@ -750,7 +791,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##-----------------------
     ## output IQR and median scores by Dx for reference biopsies
-    scores_keep <- c("AMR", "TCMR", "ATI", "IFTA", "normal",
+    scores_keep <- c("AMR", "TCMR", "aTCMR", "caTCMR", "ATI", "IFTA", "normal",
                    "g0_score", "ptc0_score", "cg0_score",
                    "i1_score", "t1_score", "iifta0_score", "v0_score",
                    "ci1_score", "ct1_score", "cv1_score")
@@ -769,6 +810,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## Q0= min and Q5=max
     ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx=="AMR",scores_keep], 2, quantile, na.rm=TRUE)
     ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="TCMR",scores_keep], 2, quantile, na.rm=TRUE)
+    #ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx %in% dx_tcmr,scores_keep], 2, quantile, na.rm=TRUE)
     ref.ati.quantiles <- apply(ref.tab[ref.tab$Dx=="ATI",scores_keep], 2, quantile, na.rm=TRUE)
     ref.ifta.quantiles <- apply(ref.tab[ref.tab$Dx=="IFTA",scores_keep], 2, quantile, na.rm=TRUE)
     ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx=="No specific Dx",scores_keep], 2, quantile, na.rm=TRUE)
@@ -933,7 +975,9 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##--------------------------
     ## combine refset and new molecular scores
     ## scores to input to PCA
-    pca_scores <- c("normal", "AMR", "TCMR", "ATI", "IFTA")
+    pca_scores <- c("normal", "AMR", "aTCMR", "ATI", "IFTA")
+    #pca_scores <- c("normal", "AMR", "TCMR", "ATI", "IFTA")
+    #pca_scores <- c("normal", "AMR", "aTCMR", "caTCMR", "IFTA")
     #pca_scores <- c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score")
     
     ## keep only Bx with all molecular scores
@@ -953,22 +997,25 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx!="new", "ref", "new"))
   
     ## simple Dx
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_amr, "AMR", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_tcmr, "TCMR", pca.df$Dx)
+    pca.df$Dx <- ifelse(pca.df$Dx %in% c("Chronic (+/- active) AMR"), "Chronic active AMR", pca.df$Dx)
+    #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_amr, "AMR", pca.df$Dx)
+    #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_tcmr, "TCMR", pca.df$Dx)
     pca.df$Dx <- ifelse(pca.df$Dx %in% dx_normal, "No specific Dx", pca.df$Dx)
     pca.df$Dx <- ifelse(pca.df$Dx %in% dx_ati, "ATI", pca.df$Dx)
     pca.df$Dx <- ifelse(pca.df$Dx %in% dx_ifta, "IFTA", pca.df$Dx)
   
-    pca.df <- pca.df[pca.df$Dx %in% c("AMR", "TCMR", "ATI", "IFTA", "No specific Dx", "new"),]
+    #pca.df <- pca.df[pca.df$Dx %in% c("AMR", "TCMR", "ATI", "IFTA", "No specific Dx", "new"),]
+    pca.df <- pca.df[pca.df$Dx %in% c("Active AMR",  "Chronic active AMR", "Acute TCMR", "Chronic active TCMR", "ATI", "IFTA", "No specific Dx", "new"),]
   
-    my_cols=c("firebrick", "#009E73", "gray80", "black", "blue3") #steelblue;dodgerblue
+    #my_cols=c("firebrick", "#009E73", "gray80", "black", "blue3") #steelblue;dodgerblue
+    my_cols=c("darkred", "dodgerblue", "#009E73", "tomato", "blue3", "lightsteelblue", "black")
     paste(levels(factor(pca.df$Dx)), my_cols)
     #table(pca.df$Dx)
   
     pca_new_1_2 <- ggplot() +
         scale_fill_manual(values=my_cols) +
         #geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) + 
-        geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=3, alpha=0.7) + 
+        geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=3, alpha=0.8) + 
         geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
         #geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=2, colour="orange") +
         xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
@@ -1012,8 +1059,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     knn_tab$ID <- rownames(knn_tab)
     knn_tab <- merge(knn_tab, pca.df[,c("ID", "Dx", "ref")], by="ID", all.x=TRUE)
   
-    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("normal", "AMR", "TCMR", "ATI", "IFTA", "ID", "Dx")]
-    test_new <- knn_tab[knn_tab$ref %in% "new",c("normal", "AMR", "TCMR", "ATI", "IFTA")]
+    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("normal", "AMR", "aTCMR", "ATI", "IFTA", "ID", "Dx")]
+    test_new <- knn_tab[knn_tab$ref %in% "new",c("normal", "AMR", "aTCMR", "ATI", "IFTA")]
     #train_ref <- knn_tab[knn_tab$ref=="ref",c("cg", "g", "ptc", "i", "t", "ID", "Dx")]
     #test_new <- knn_tab[knn_tab$ref=="new",c("cg0", "g0", "ptc0", "i1", "t1")]
   

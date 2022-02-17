@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.4"
+title: "&nbsp;v1.5"
 output:
   prettydoc::html_pretty:
     theme: architect
