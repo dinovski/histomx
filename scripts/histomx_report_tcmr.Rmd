@@ -288,7 +288,7 @@ kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html")
 \newpage
 ***
 ### Pathway analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the # of enriched genes; GeneRatio=the % of total genes associated with the pathway).'}
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the # of enriched genes; % = genes associated with the pathway).'}
 
 #gridExtra::grid.arrange(newPreds$cell_type_radar, newPreds$pathway_radar, ncol=2, nrow=1)
 
