@@ -40,6 +40,9 @@ colnames(mscores_ref)[colnames(mscores_ref)=="catcmr"]<-"caTCMR"
 colnames(mscores_ref)[colnames(mscores_ref)=="ati"]<-"ATI"
 colnames(mscores_ref)[colnames(mscores_ref)=="ifta"]<-"IFTA"
 
+## import Banff scores
+banff_ref <- read.table('../static/refset_banff_scores_all.txt', header=TRUE, sep='\t', stringsAsFactors=FALSE)
+
 ## Define histology diagnosis categories
 dx_normal <- c("Normal or minimal changes", "Pristine", "No specific diagnosis")
 dx_amr <- c("Active AMR", "Chronic (+/- active) AMR")
@@ -329,14 +332,15 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
                        xend = reorder(str_wrap(Pathway, 7), GeneRatio),
                        yend = 100), linetype = "dashed", color = "navy") +
                        #yend = max(GeneRatio)), linetype = "dashed", color = "navy") + 
-      ## Add dots to represent the count
+      ## add dots to represent the count
       geom_point(aes(x=reorder(str_wrap(Pathway, 7), Count), y = Count), size = 3, color = "navy") +
       geom_text_repel(data=pathway_table[pathway_table$Count>0,], ## add count for pathways with count>0
                       aes(x=reorder(str_wrap(Pathway, 7), Count), y = Count, label=Count), size=3, colour="navy") +
       coord_polar(clip="off") +
-      ## Scale y axis so bars don't start in the center
-      #scale_y_continuous(limits = c(-10, max(pathway_table$Total)),expand = c(0, 0), breaks = c(0, 5, 10, 20)) + 
-      #scale_fill_gradientn("Number of genes", colours = c( "#6C5B7B","#C06C84","#F67280","#F8B195"))
+      ## scale y axis so bars don't start in the center
+      #scale_y_continuous(limits = c(-10, max(pathway_table$Total)),expand = c(0, 0), breaks = c(0, 5, 10, 20)) +
+      ## set color gradient
+      #scale_fill_gradientn("Number of genes", colours = c( "#6C5B7B","#C06C84","#F67280","#F8B195")) +
       #scale_fill_gradient(low="lightblue", high="darkblue", limits=c(0,100)) +
       #scale_fill_gradientn(colours=brewer.pal(4, "Blues"), limits=c(0,100)) +
       scale_fill_gradientn(colours=c("#EFF3FF", "#BDD7E7", "#6BAED6", "darkblue"), limits=c(0,100)) +
@@ -893,8 +897,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
       dat.m <- data.table::melt(dat)
     })
     dat.m$value <- dat.m$value * 100
-  
-    #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
     boxplot_atcmr <- ggplot(data=dat.m, aes(x=variable, y=value)) + 
         ggtitle("TCMR reference biopsies") +
         ylab("molecular score (%)") + xlab("") +
@@ -911,37 +913,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
               axis.title.y=element_text(face="bold", size=14),  
               panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
     #ggsave(paste0(newOut, "/atcmr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_tcmr, device="pdf", width=8, height=6)
-    
-    ## ATI
-    dat <- ref.tab[ref.tab$Dx=="ATI",]
-    dat <- dat[,scores_keep]
-    ati_order <- names(ref.ati.median[order(ref.ati.median, decreasing=F)])
-    ## order by median scores (reorder not working)
-    dat <- dat[,ati_order]
-    colnames(dat) <- gsub("_score", "", colnames(dat))
-    suppressWarnings({
-      dat.m <- data.table::melt(dat)
-    })
-    dat.m$value <- dat.m$value * 100
-  
-    #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) + 
-    boxplot_ati <- ggplot(data=dat.m, aes(x=variable, y=value)) + 
-        ggtitle("ATI reference biopsies") +
-        ylab("molecular score (%)") + xlab("") +
-        geom_hline(yintercept=50, linetype="dashed", color="slategray") +
-        geom_boxplot(color="steelblue4", fill="whitesmoke") +
-        theme(legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"), 
-              panel.grid.major=element_blank(),
-              panel.background=element_blank(), 
-              axis.line=element_line(colour="white"),
-              axis.text.x=element_text(face="bold", size=14, angle=0),
-              axis.title.x=element_text(face="bold", size=14, angle=0),
-              axis.text.y=element_text(size=14, angle=0),
-              axis.title.y=element_text(face="bold", size=14),  
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #ggsave(paste0(newOut, "/ati_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_tcmr, device="pdf", width=8, height=6)
-  
+
     ## Normal
     dat <- ref.tab[ref.tab$Dx=="No specific Dx",]
     dat <- dat[,scores_keep]
@@ -1008,7 +980,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     pca.df <- pca.df[pca.df$Dx %in% c("Active AMR",  "Chronic active AMR", "Acute TCMR", "Chronic active TCMR", "ATI", "IFTA", "No specific Dx", "new"),]
   
     #my_cols=c("firebrick", "#009E73", "gray80", "black", "blue3") #steelblue;dodgerblue
-    my_cols=c("darkred", "dodgerblue", "#009E73", "tomato", "blue3", "lightsteelblue", "black")
+    my_cols=c("darkred", "blue3", "#009E73", "tomato", "dodgerblue", "lightsteelblue", "black")
     paste(levels(factor(pca.df$Dx)), my_cols)
     #table(pca.df$Dx)
   
@@ -1053,7 +1025,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##-----------------------------
     ## KNN: k-nearest neighbors
     ##-----------------------------
-    k=50
+    k=25
     #knn_tab <- rbind(mscores_ref[,pca_scores], mscores_new[,pca_scores])
     knn_tab <- mscores_all
     knn_tab$ID <- rownames(knn_tab)
@@ -1080,17 +1052,40 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
   
     ##----------------
     ## histology based diagnosis of nearest neighbors
-    length(nn_df$ID) == k
+    #length(nn_df$ID) == k
     nn_dx <- data.frame(table(knn_tab[knn_tab$ID %in% nn_df$ID,"Dx"]))
     colnames(nn_dx) <- c("Dx", "Total")
     nn_dx <- nn_dx[nn_dx$Dx!="new",]
     sum(nn_dx$Total) == k
-    nn_dx$Percent <- round(nn_dx$Total/sum(nn_dx$Total) * 100, 2)
+    nn_dx$Percent <- round(nn_dx$Total/sum(nn_dx$Total) * 100, 0)
   
     nn_dx <- nn_dx[order(nn_dx$Total, decreasing=TRUE),]
     rownames(nn_dx) <- nn_dx$Dx
     nn_dx$Dx <- NULL
-  
+    
+    ##----------------
+    ## banff scores of nearest neighbors
+    banff_df <- merge(nn_df, banff_ref[,c("ID", "g_score", "ptc_score", "cg_score", "i_score", "t_score")], by="ID")
+    
+    g_df <- data.frame(g=table(banff_df$g_score, useNA="no"))
+    ptc_df <- data.frame(ptc=table(banff_df$ptc_score, useNA="no"))
+    cg_df <- data.frame(cg=table(banff_df$cg_score, useNA="no"))
+    i_df <- data.frame(i=table(banff_df$i_score, useNA="no"))
+    t_df <- data.frame(t=table(banff_df$t_score, useNA="no"))
+    
+    score_df <- data.frame(score=c("0", "1", "2", "3"))
+    score_df <- merge(score_df, g_df, by.x="score", by.y="g.Var1", all=TRUE)
+    score_df <- merge(score_df, ptc_df, by.x="score", by.y="ptc.Var1", all=TRUE)
+    score_df <- merge(score_df, cg_df, by.x="score", by.y="cg.Var1", all=TRUE)
+    score_df <- merge(score_df, i_df, by.x="score", by.y="i.Var1", all=TRUE)
+    score_df <- merge(score_df, t_df, by.x="score", by.y="t.Var1", all=TRUE)
+    
+    score_df[is.na(score_df)]<-0
+    
+    rownames(score_df) <- score_df$score
+    nn_banff <- data.frame(round(apply(score_df[,-1], 2, function(x) {x/sum(x)*100}), 0), check.names=F) #% of Bx with given score by lesion
+    colnames(nn_banff) <- gsub(".Freq", "", colnames(nn_banff))
+    
     ##----------------
     ## mean molecular score of nearest neighbors
     ## TODO: if not all Dx in nn_dx table
@@ -1215,11 +1210,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## output files and plots for markdown report
     return(list(score_table=mscores_new_pct,
               ref_scores=ref.score.quantiles,
-              knn=nn_dx,
-              #aa_cluster_table=cluster_table,
-              #aa_cluster_new=pred_aa, #new sample cluster probs
+              knn_dx=nn_dx,
+              knn_banff=nn_banff,
               pca_1_2=pca_new_1_2,
               pca_2_3=pca_new_2_3,
+              #aa_cluster_table=cluster_table,
+              #aa_cluster_new=pred_aa, #new sample cluster probs
               #pca_archetype=pca_aa,
               pathways=pathway_table,
               #pathway_plot=pathway_plot,

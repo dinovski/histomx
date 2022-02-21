@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.5"
+title: "&nbsp;v1.6"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -71,8 +71,8 @@ outPath=paste0(newPath, '/histomx_results/')
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
 ## and return a list of these files
 newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
-newID <- gsub("-", ".", newPreds$score_table$ID)
 dev.off()
+newID <- gsub("-", ".", newPreds$score_table$ID)
 
 ## Output sequencing run info
 newQC <- rccQC(newRCC, outPath)
@@ -279,15 +279,24 @@ newPreds$pca_1_2
 </div>
 
 ***
-### Histologic Diagnosis of 50 Nearest Neighbors
+### Histologic Diagnosis of 25 Nearest Neighbors
 ```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
-newPreds$knn$Dx <- rownames(newPreds$knn)
-newPreds$knn <- newPreds$knn[,c("Dx", "Total", "Percent")]
+newPreds$knn_dx$Dx <- rownames(newPreds$knn_dx)
+newPreds$knn_dx <- newPreds$knn_dx[,c("Dx", "Total", "Percent")]
 
-kable(newPreds$knn, row.names=FALSE, align='c', caption="", format="html") %>%
+kable(newPreds$knn_dx, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(c(1,2,3), bold=TRUE, background="white")
 ```
-&nbsp;  
+
+### Banff scores of 25 Nearest Neighbors (%)
+```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
+newPreds$knn_banff$score <- rownames(newPreds$knn_banff)
+newPreds$knn_banff <- newPreds$knn_banff[,c("score", "g", "ptc", "cg", "i", "t")]
+
+kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html") %>%
+    column_spec(c(1,2,3,4,5,6), bold=TRUE, background="white")
+```
+&nbsp; 
 
 \newpage
 ***
