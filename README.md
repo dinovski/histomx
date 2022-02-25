@@ -53,8 +53,7 @@ RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report_tcmr.Rmd
 mkdir -p $HISTOMX_PATH/refRCCs
 ```
 
-7. Download all reference RCC files:  
-https://drive.google.com/drive/folders/16MoE49JABUbHulXyG6ocZuCbIQnhYuqH?usp=sharing
+7. Download all reference RCC files from the server.  
 
 8. Move all RCC files to this directory:
 ```
