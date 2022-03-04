@@ -90,6 +90,7 @@ plotPrediction <- function(truth, predicted, threshold) {
 importRCC <- function(rccFile) {
     
     rccFile <- readLines(rccFile)
+    rccFile <- trimws(rccFile, which="both") #remove leading/trailing whitespace
     rccFile <- data.frame(line = rccFile, tag = rep("", length(rccFile)), stringsAsFactors = FALSE)
 
     ## lane attributes contain Fov, BD

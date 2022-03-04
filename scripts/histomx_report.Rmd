@@ -288,15 +288,14 @@ kable(newPreds$knn_dx, row.names=FALSE, align='c', caption="", format="html") %>
     column_spec(c(1,2,3), bold=TRUE, background="white")
 ```
 
+```{r, echo=FALSE, warning=FALSE, results='asis', eval=FALSE}
 ### Banff scores of 25 Nearest Neighbors (%)
-```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
 newPreds$knn_banff$score <- rownames(newPreds$knn_banff)
 newPreds$knn_banff <- newPreds$knn_banff[,c("score", "g", "ptc", "cg", "i", "t")]
 
 kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(c(1,2,3,4,5,6), bold=TRUE, background="white")
 ```
-&nbsp; 
 
 \newpage
 ***
