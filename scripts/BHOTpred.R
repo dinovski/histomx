@@ -156,9 +156,9 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     
     ##------------------
     ## temporary solution:
-    #write.table(countTable, file='../static/raw_counts_refset.txt', quote=F, row.names=F, sep='\t')
+    #write.table(countTable, file='../static/refset_raw_counts.txt', quote=F, row.names=F, sep='\t')
     
-    ns.data <- read.table('../static/raw_counts_refset.txt', sep='\t', header=TRUE, check.names=FALSE)
+    ns.data <- read.table('../static/refset_raw_counts.txt', sep='\t', header=TRUE, check.names=FALSE)
     ns.new <- parseRCC(newRCC)
     countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"))
     rownames(countTable) <- countTable$Name
