@@ -136,24 +136,32 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     dir.create(paste0(outPath, newID), recursive=TRUE, showWarnings=FALSE)
     newOut=paste0(outPath, newID)
   
+    ##------------------
     ## combine refset and new RCC into single count table
-    RCCfiles <- c(refRCC, newRCC)
+    ## TODO: pre-parse reference data and save table > add new RCC to table
+    #RCCfiles <- c(refRCC, newRCC)
+    #ns.data <- parseRCC(RCCfiles)
   
-    ns.data <- parseRCC(RCCfiles)
-  
-    countTable <- ns.data$counts
-    rownames(countTable) <- countTable$Name
+    #countTable <- ns.data$counts
+    #rownames(countTable) <- countTable$Name
     
     ## rename newID if also exists in refset sample names: rownames(mscores_ref)
-    samp_ind <- grep(newID, colnames(countTable))
-    if (length(samp_ind) > 1) {
-      colnames(countTable)[samp_ind][1]<-newID
-      colnames(countTable)[samp_ind][2]<-"histomx-new"
-    }
+    #samp_ind <- grep(newID, colnames(countTable))
+    #if (length(samp_ind) > 1) {
+    #  colnames(countTable)[samp_ind][1]<-newID
+    #  colnames(countTable)[samp_ind][2]<-"histomx-new"
+    #}
+    ## keep only samples used in classifiers: eventually exclude unused RCC files from final repo
+    #countTable <- countTable[,colnames(countTable) %in% c("CodeClass", "Name", "Accession", rownames(mscores_ref), newID)]
     
-    ## keep only samples used in classifiers
-    ## eventually exclude unused RCC files from final repo
-    countTable <- countTable[,colnames(countTable) %in% c("CodeClass", "Name", "Accession", rownames(mscores_ref), newID)]
+    ##------------------
+    ## temporary solution:
+    #write.table(countTable, file='../static/raw_counts_refset.txt', quote=F, row.names=F, sep='\t')
+    
+    ns.data <- read.table('../static/raw_counts_refset.txt', sep='\t', header=TRUE, check.names=FALSE)
+    ns.new <- parseRCC(newRCC)
+    countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"))
+    rownames(countTable) <- countTable$Name
     
     ##------------------------
     ## normalization: no background correction

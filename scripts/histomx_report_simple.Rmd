@@ -113,11 +113,11 @@ if(nrow(pt_df) %% 2 == 0) {
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "ATI", "IFTA")]))
 ## exclude 'normal' molecular score
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "normal", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "ATI", "normal", "IFTA", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 #tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -148,6 +148,10 @@ tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" &
 tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
 
+## reference biopsy ATI molecular score ranges
+tab[rownames(tab)=="ATI","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","ATI"]
+tab[rownames(tab)=="ATI","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","ATI"]
+
 ## reference biopsy IFTA molecular score ranges
 tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
 tab[rownames(tab)=="IFTA","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","IFTA"]
@@ -174,9 +178,8 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
     column_spec(2, bold=TRUE, color="dodgerblue") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
-
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, atrophy/fibrosis (isolated IFTA).
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
 
 \newpage
 
