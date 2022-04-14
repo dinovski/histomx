@@ -349,8 +349,13 @@ newPreds$cell_type_radar
 
 ***
 ### Polyomavirus expression
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Normalized gene expression of Polyomavirus BK VP1 and Polyomavirus BK Large T Antigen in the test sample and reference biopsies with BKV or no specific diagnosis/lesions'}
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center',  fig.width=4, fig.height=3, fig.cap='Normalized expression of Polyomavirus BK VP1 and Polyomavirus BK Large T Antigen genes in the test sample and reference biopsies with BKV or no specific diagnosis/lesions'}
 
+newPreds$bkv_plot
+
+```
+
+```{r, echo=FALSE, warning=FALSE, include=TRUE}
 bkv_df <- newPreds$bkv_stats
 bkv_df <- data.frame(apply(bkv_df, 1, as.character))
 rownames(bkv_df) <- colnames(newPreds$bkv_stats)
