@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.6"
+title: "&nbsp;v1.7"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -16,7 +16,8 @@ params:
 
 ```{r, include=FALSE, eval=FALSE}
 ## to run manually
-rmarkdown::render('./scripts/histomx_report.Rmd')
+newRCC='../test_files/test.RCC'
+rmarkdown::render('../scripts/histomx_report.Rmd')
 ## convert output html to paged PDF 
 system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
 ```
@@ -34,7 +35,6 @@ library(gridExtra, quietly=TRUE)
 library(knitr, quietly=TRUE)
 opts_knit$set(eval.after = "fig.cap")
 library(kableExtra, quietly=TRUE)
-#library(xtable)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -120,11 +120,11 @@ if(nrow(pt_df) %% 2 == 0) {
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "ATI", "IFTA")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA")]))
 ## exclude 'normal' molecular score
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "ATI", "normal", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "normal", "IFTA", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 #tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -155,10 +155,6 @@ tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" &
 tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
 
-## reference biopsy ATI molecular score ranges
-tab[rownames(tab)=="ATI","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","ATI"]
-tab[rownames(tab)=="ATI","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","ATI"]
-
 ## reference biopsy IFTA molecular score ranges
 tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
 tab[rownames(tab)=="IFTA","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","IFTA"]
@@ -187,23 +183,55 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
 
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, and atrophy/fibrosis (isolated IFTA).
 
 \newpage
 
 ### Banff lesion based probabilities (%):
+```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE, fig.align='center', fig.width=6, fig.height=5}
+banff_preds <- data.frame(t(newPreds$score_table))
+banff_tab <- data.frame(lesion=c("g", "ptc", "i", "t"))
+banff_tab$'0' <- as.numeric(banff_preds[c("g0", "ptc0", "i0", "t0"),])
+banff_tab$'1' <- as.numeric(banff_preds[c("g1", "ptc1", "i1", "t1"),])
+banff_tab$'2' <- as.numeric(banff_preds[c("g2", "ptc2", "i2", "t2"),])
+banff_tab$'3' <- as.numeric(banff_preds[c("g3", "ptc3", "i3", "t3"),])
+rownames(banff_tab) <- banff_tab$lesion
+
+banff.df <- data.table::melt(banff_tab)
+banff.df$lesion <- factor(banff.df$lesion, levels=c("t", "i", "ptc", "g"))
+banff.df$variable <- factor(banff.df$variable, levels=c("0", "1", "2", "3"))
+my_cols=c("steelblue4", "steelblue", "lightblue", "lightcyan")
+
+ggplot(banff.df, aes(x=variable, y=lesion, size=value)) + xlab("") + ylab("") +
+	geom_point(aes(fill=value), pch=21, colour="azure4", alpha=1) +
+	scale_size(range = c(0, 30), name="%", guide="none") + #increase relative bubble size
+	scale_fill_gradientn(colours=rev(my_cols), limits=c(0,100)) +
+	theme(panel.grid.major = element_line(colour = "#d3d3d3"), panel.grid.minor=element_blank(),
+	      panel.background=element_blank(), axis.line=element_line(colour="white"),
+	      axis.text=element_text(size=18, color="navy"),
+	      axis.title.x=element_text(size=18, color="navy"), 
+	      axis.title.y=element_text(size=18, color="navy"),
+	      legend.title=element_blank(),
+	      legend.text=element_text(size=14, color="darkslateblue"), legend.key.size = unit(1, 'cm'),
+	      panel.border=element_rect(colour="gray", fill=NA, size=1))
+
+kable(banff_tab, row.names=FALSE, align='c', format="html") %>%
+    column_spec(1, bold=TRUE, color="black") %>%
+    row_spec(c(1,3), background="whitesmoke") %>% row_spec(c(2,4), background="white")
+```
+Banff lesion based probabilities for each score.
+
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## table of molecular scores
-ms_new <- data.frame(t(newPreds$score_table[,c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("cg0_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score")]))
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "cg0_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
 colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
-                   "ATI Q1", "ATI Q3", "IFTA Q1", "IFTA Q3",
-                   "No lesion Q1", "No lesion Q3")
+                   "IFTA Q1", "IFTA Q3", "No lesion Q1", "No lesion Q3")
 rownames(tab) <- rownames(ms_new)
 
 ## add reference biopsy molecular score ranges
@@ -213,8 +241,6 @@ for(i in 1:nrow(tab)) {
   tab[rownames(tab)==rownames(ms_new)[i],"AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"ATI Q1"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="25%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"IFTA Q1"] <- ms_ref[ms_ref$Dx=="IFTA" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"IFTA Q3"] <- ms_ref[ms_ref$Dx=="IFTA" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%",rownames(ms_new)[i]]
@@ -224,10 +250,9 @@ for(i in 1:nrow(tab)) {
 #tab <- tab[!is.na(colnames(tab))]
 tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
 tab$'TCMR range' <- paste(tab$`TCMR Q1`, "-", tab$`TCMR Q3`)
-tab$'ATI range' <- paste(tab$`ATI Q1`, "-", tab$`ATI Q3`)
 tab$'IFTA range' <- paste(tab$`IFTA Q1`, "-", tab$`IFTA Q3`)
 tab$'Normal range' <- paste(tab$`No lesion Q1`, "-", tab$`No lesion Q3`)
-tab$'Banff lesion' <- gsub("_", " ", rownames(tab))
+tab$'lesion' <- gsub("_", " ", rownames(tab))
 
 if(!all(rownames(ms_new)==rownames(tab))) {
   stop("check concordance of lesion score names between new sample and refset")
@@ -243,12 +268,12 @@ tab$Interpretation <- ifelse(tab[,newID]<=10,"unlikely",
                                                                   ifelse(tab[,newID]>80,"very high probability","NA"))))))
 
 ## return range for 'normal' biopsies
-ref_quantiles <- tab[,c(newID, "Banff lesion", "Normal range", "Interpretation")]
+ref_quantiles <- tab[,c(newID, "lesion", "Normal range", "Interpretation")]
 
-ref_quantiles$'Banff lesion' <- gsub("0 score", " > 0", ref_quantiles$'Banff lesion')
-ref_quantiles$'Banff lesion' <- gsub("1 score", " > 1", ref_quantiles$'Banff lesion')
+ref_quantiles$'lesion' <- gsub("0 score", " > 0", ref_quantiles$'lesion')
+ref_quantiles$'lesion' <- gsub("1 score", " > 1", ref_quantiles$'lesion')
 
-ref_quantiles <- ref_quantiles %>% relocate('Banff lesion', .before = colnames(ref_quantiles)[1])
+ref_quantiles <- ref_quantiles %>% relocate('lesion', .before = colnames(ref_quantiles)[1])
 #ref_quantiles <- ref_quantiles[order(ref_quantiles[,newID], decreasing=TRUE),]
 
 kable(ref_quantiles, row.names=FALSE, align='c', format="html") %>%
@@ -258,11 +283,7 @@ kable(ref_quantiles, row.names=FALSE, align='c', format="html") %>%
 
 #Ranges are defined by Q1 and Q3, the upper and lower bounds of the middle 50% of the reference biopsy molecular scores for each histology based diagnosis.
 ```
-Banff lesion based molecular scores represent the probability that a biopsy has a Banff score >0 or >1, as indicated for each lesion.  
-
-__Interpretations:__   
-unlikely (<10%), low (10-20%), moderate (20-40%),  
-moderate/high (40-60%), high (60-80%), very high (80-100%)
+Banff lesion based scores represent the probability that a biopsy has a Banff score >0 or >1, as indicated for each lesion: unlikely (<10%), low (10-20%), moderate (20-40%), moderate/high (40-60%), high (60-80%), very high (80-100%).
 
 \newpage
 
@@ -325,6 +346,28 @@ newPreds$cell_type_radar
 #           row_spec(1:nrow(ct_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
 
 ```
+
+***
+### Polyomavirus expression
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Normalized gene expression of Polyomavirus BK VP1 and Polyomavirus BK Large T Antigen in the test sample and reference biopsies with BKV or no specific diagnosis/lesions'}
+
+bkv_df <- newPreds$bkv_stats
+bkv_df <- data.frame(apply(bkv_df, 1, as.character))
+rownames(bkv_df) <- colnames(newPreds$bkv_stats)
+bkv_df <- bkv_df[rownames(bkv_df) %in% c("normal_median", "bkv_median", "new_counts", "new_normal_pval", "new_bkv_pval", "bkv_normal_pval"),]
+
+rownames(bkv_df)[rownames(bkv_df)=="normal_median"]<-"normal samples median expression"
+rownames(bkv_df)[rownames(bkv_df)=="bkv_median"]<-"BKV samples median expression"
+rownames(bkv_df)[rownames(bkv_df)=="new_counts"]<-paste(newID, "mean expression")
+rownames(bkv_df)[rownames(bkv_df)=="new_normal_pval"]<-paste(newID, "v. normal biopsies p-value")
+rownames(bkv_df)[rownames(bkv_df)=="new_bkv_pval"]<-paste(newID, "v. BKV biopsies p-value")
+rownames(bkv_df)[rownames(bkv_df)=="bkv_normal_pval"]<-"BKV v. normal biopsies p-value"
+
+kable(bkv_df, row.names=TRUE, align=rep('c', 3), format="html") %>%
+           row_spec(1:nrow(bkv_df), background="white") %>% column_spec(c(1), bold=TRUE, background="whitesmoke")
+	
+```
+p-values were computed using a Wilcoxon rank-sum test to compare BKV gene expression.
 
 ***
 ### Clinician signout

@@ -1,7 +1,7 @@
 library(ggplot2)
 library(stringr)
 
-banff_score_table <- read.table('~/Desktop/histomx/test_files//banff_score_table.txt', sep='\t', header=TRUE, check.names=FALSE)
+banff_score_table <- read.table('~/Desktop/histomx/test_files/banff_score_table.txt', sep='\t', header=TRUE, check.names=FALSE)
 rownames(banff_score_table) <- banff_score_table$score
 
 ##-----------------

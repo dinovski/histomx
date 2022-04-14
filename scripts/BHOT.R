@@ -1,10 +1,9 @@
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "ordinal", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
-#BiocManager::install("NormqPCR")
 
 if(length(missing_libraries) > 0) {
 	cat("The following libraries are missing:\n", missing_libraries)
@@ -12,6 +11,12 @@ if(length(missing_libraries) > 0) {
 
 ## Load all packages
 lapply(library_list, library, quietly=TRUE, character.only=TRUE)
+
+## Output data frame with all required packages
+package_dump <- function() {
+    si <- data.frame(sessioninfo::package_info(pkgs = c("attached")[1], include_base = FALSE, dependencies = NA))
+    dump("si","histomx_pckgs.Rdmpd")
+}
 
 ##------------------------------
 ## geometric mean
@@ -180,10 +185,10 @@ qcAttributes <- function(attributes_table) {
         cat(">>All samples pass Imaging QC\n")
     }
     
-    ## Binding density: 0.1 to 2.25 for MAX/FLEX instruments; 0.1-1.8 for SPRINT instruments
-    if (any(qcTab$BindingDensity < 0.1 | qcTab$BindingDensity > 2.25)) {
+    ## Binding density: 0.05 to 2.25 for MAX/FLEX instruments; 0.1-1.8 for SPRINT instruments
+    if (any(qcTab$BindingDensity < 0.05 | qcTab$BindingDensity > 2.25)) {
         cat(">>Binding Density flag: sample(s) out of range (0.1 < BD < 2.25):\n")
-        print.data.frame(qcTab[qcTab$BindingDensity < 0.1 | qcTab$BindingDensity > 2.25,c("ID", "BindingDensity")])
+        print.data.frame(qcTab[qcTab$BindingDensity < 0.05 | qcTab$BindingDensity > 2.25,c("ID", "BindingDensity")])
         cat("\n")
     } else {
         cat(">>All samples pass Binding Density QC\n")
@@ -417,7 +422,7 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
               panel.border=element_rect(colour="black", fill=NA, size=1))
     
     ## select HK genes to be used in normalization
-    ## manually or automatically (M<0.7): experimental value shown to eliminate most variable genes in microarray data
+    ## manually or automatically (M<0.7)
     num_hk_genes=as.numeric(as.character(hk_m[hk_m$meanM<0.7,][1,"n_genes"]))
     
     hk_genes_keep <- hk_rank[1:num_hk_genes,"gene"]
@@ -569,7 +574,7 @@ RUVnorm <- function(eset, k, method="RUVg") {
     }
     
     ##------------------------------
-    ## negative control genes
+    ## negative control genes = genes assumed not to be DE with respect to the covariate of interest
     c_idx <- rownames(eset)[fData(eset)$CodeClass == "Housekeeping"]
     
     if(method=="RUVg") {
@@ -688,7 +693,7 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
     
     ## DESeq2 outputs NA values for adjusted p values based on independent filtering of genes that have low counts
     ## convert these to 1
-    df.fit$padj<- ifelse(is.na(df.fit$padj), 1, df.fit$padj)
+    df.fit$padj <- ifelse(is.na(df.fit$padj), 1, df.fit$padj)
 
     df.fit$logP <- -log10(df.fit$pvalue)
     df.fit$logPadj <- -log10(df.fit$padj)
@@ -834,13 +839,14 @@ rccQC <- function(RCCfile, outPath) {
 ##------------------
 ## Differential expression analysis for comparisons of interest
 
+## DESEq2
 runDESeq <- function(raw_counts, col_data, exp_design) {
     
     deseq.res <- DESeqDataSetFromMatrix(countData = raw_counts, 
                                         colData = col_data, 
                                         design = formula(exp_design))
     deseq.res <- DESeq(deseq.res, test="Wald")
-    deseq.res.sig <- results(deseq.res, pAdjustMethod="bonferroni", tidy=TRUE)
+    deseq.res.sig <- results(deseq.res, pAdjustMethod="BH", tidy=TRUE)
     deseq.res.sig <- deseq.res.sig[order(deseq.res.sig$pvalue, decreasing=FALSE),]
     rownames(deseq.res.sig) <- deseq.res.sig$row
     hist(deseq.res.sig$pvalue, main="")
@@ -849,8 +855,40 @@ runDESeq <- function(raw_counts, col_data, exp_design) {
     
 }
 
-## Output data frame with all required packages
-package_dump <- function() {
-    si <- data.frame(sessioninfo::package_info(pkgs = c("attached")[1], include_base = FALSE, dependencies = NA))
-    dump("si","histomx_pckgs.Rdmpd")
+## Wilcoxon Rank-Sum test
+# norm_counts: normalized count matrix (rows=genes)
+# exp_design: dataframe with the columns sample ID and condition/group
+# contrast: column name in exp_design indicating groups to be compared (coded as 0 or 1)
+
+runWilcox <- function(norm_counts, exp_design, contrast) {
+    
+    if (!exists('contrast')) {
+        print("contrast name is missing")
+    }
+        
+    tab.wilcox <- data.frame(gene=rownames(norm_counts))
+    
+    dat <- data.frame(t(norm_counts), check.names=FALSE)
+    dat$condition <- exp_design[,contrast][match(rownames(dat), exp_design$ID)]
+    
+    tab.wilcox$pvalue <- sapply(1:nrow(tab.wilcox), function(i) {
+        gene <- tab.wilcox[i,]
+        dat.gene <- dat[,colnames(dat) %in% c(gene, "condition")]
+        p=wilcox.test(dat.gene[,1] ~ dat.gene$condition, paired=FALSE, alternative="two.sided")$p.value
+
+        return(p)
+    })
+    
+    tab.wilcox$padj <- p.adjust(tab.wilcox$pvalue, method = "BH")
+    tab.wilcox <- tab.wilcox[order(tab.wilcox$pval, decreasing=FALSE),]
+    
+    counts_1 <- dat[dat$condition=="1",]
+    counts_1 <- counts_1[,!colnames(counts_1) %in% "condition"]
+    counts_0 <- dat[dat$condition=="0",]
+    counts_0 <- counts_0[,!colnames(counts_0) %in% "condition"]
+    tab.wilcox$log2FoldChange <- colMeans(counts_1) - colMeans(counts_0)
+    tab.wilcox$FC <- 2^tab.wilcox$log2FoldChange
+    
+    return(tab.wilcox)
+    
 }

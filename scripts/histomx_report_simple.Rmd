@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.6"
+title: "&nbsp;v1.7"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -113,11 +113,11 @@ if(nrow(pt_df) %% 2 == 0) {
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "ATI", "IFTA")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA")]))
 ## exclude 'normal' molecular score
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "ATI", "normal", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "normal", "IFTA", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 #tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -147,10 +147,6 @@ tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" &
 # tab[rownames(tab)=="TCMR","ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
-
-## reference biopsy ATI molecular score ranges
-tab[rownames(tab)=="ATI","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","ATI"]
-tab[rownames(tab)=="ATI","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","ATI"]
 
 ## reference biopsy IFTA molecular score ranges
 tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
@@ -216,7 +212,7 @@ tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
 tab$'TCMR range' <- paste(tab$`TCMR Q1`, "-", tab$`TCMR Q3`)
 tab$'IFTA range' <- paste(tab$`IFTA Q1`, "-", tab$`IFTA Q3`)
 tab$'Normal range' <- paste(tab$`No lesion Q1`, "-", tab$`No lesion Q3`)
-tab$'Banff lesion' <- gsub("_", " ", rownames(tab))
+tab$'lesion' <- gsub("_", " ", rownames(tab))
 
 if(!all(rownames(ms_new)==rownames(tab))) {
   stop("check concordance of lesion score names between new sample and refset")
@@ -232,13 +228,12 @@ tab$Interpretation <- ifelse(tab[,newID]<=10,"unlikely",
                                                                   ifelse(tab[,newID]>80,"very high probability","NA"))))))
 
 ## return range for 'normal' biopsies
-ref_quantiles <- tab[,c(newID, "Banff lesion", "Normal range", "Interpretation")]
+ref_quantiles <- tab[,c(newID, "lesion", "Normal range", "Interpretation")]
 
-ref_quantiles$'Banff lesion' <- gsub("0 score", " > 0", ref_quantiles$'Banff lesion')
-ref_quantiles$'Banff lesion' <- gsub("1 score", " > 1", ref_quantiles$'Banff lesion')
+ref_quantiles$'lesion' <- gsub("0 score", " > 0", ref_quantiles$'lesion')
+ref_quantiles$'lesion' <- gsub("1 score", " > 1", ref_quantiles$'lesion')
 
-ref_quantiles <- ref_quantiles %>% relocate('Banff lesion', .before = colnames(ref_quantiles)[1])
-#ref_quantiles <- ref_quantiles[order(ref_quantiles[,newID], decreasing=TRUE),]
+ref_quantiles <- ref_quantiles %>% relocate('lesion', .before = colnames(ref_quantiles)[1])
 
 kable(ref_quantiles, row.names=FALSE, align='c', format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
@@ -247,7 +242,7 @@ kable(ref_quantiles, row.names=FALSE, align='c', format="html") %>%
 
 #Ranges are defined by Q1 and Q3, the upper and lower bounds of the middle 50% of the reference biopsy molecular scores for each histology based diagnosis.
 ```
-Banff lesion based molecular scores represent the probability that a biopsy has a Banff score >0 or >1, as indicated for each lesion.  
+Banff lesion based scores represent the probability that a biopsy has a Banff score >0 or >1, as indicated for each lesion.  
 
 __Interpretations:__   
 unlikely (<10%), low (10-20%), moderate (20-40%),  
