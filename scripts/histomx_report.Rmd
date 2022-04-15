@@ -357,31 +357,26 @@ newPreds$bkv_plot
 
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
 bkv_df <- newPreds$bkv_stats
-bkv_df <- data.frame(apply(bkv_df, 1, as.character))
-rownames(bkv_df) <- colnames(newPreds$bkv_stats)
-bkv_df <- bkv_df[rownames(bkv_df) %in% c("new_normal_pval", "new_bkv_pval"),]
+bkv_df <- data.frame(pval=colnames(newPreds$bkv_stats), apply(bkv_df, 1, as.character))
+bkv_df <- bkv_df[bkv_df$pval %in% c("new_normal_pval", "new_bkv_pval"),]
 
 ## interpretation (if both pvalues sig)
 # alternate hypothesis=higher
-new_normal_results <- ifelse(bkv_df[1,] > 0.05, "BKV expression is not significantly higher than normal biopsies",
-			     ifelse(bkv_df[1,] < 0.01, "BKV expression is moderately higher than normal biopsies",
+new_normal_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.05, "BKV expression is not significantly higher than normal biopsies",
+			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] < 0.01, "BKV expression is moderately higher than normal biopsies",
 			     "BKV expression is significantly higher than normal biopsies"))
 # alternate hypothesis=lower
-new_bkv_results <- ifelse(bkv_df[1,] >= 0.05, "BKV expression is not signficiantly high compared to BKV biopsies",
-			     ifelse(bkv_df[1,] < 0.01, "BKV expression is moderately similar to BKV biopsies",
+new_bkv_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] >= 0.05, "BKV expression is not signficiantly high compared to BKV biopsies",
+			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] < 0.01, "BKV expression is moderately similar to BKV biopsies",
 			     "BKV expression is signficiantly similar to normal biopsies"))
 
 ## rename results
-#rownames(bkv_df)[rownames(bkv_df)=="normal_median"]<-"normal samples median expression"
-#rownames(bkv_df)[rownames(bkv_df)=="bkv_median"]<-"BKV samples median expression"
-#rownames(bkv_df)[rownames(bkv_df)=="new_counts"]<-paste(newID, "mean expression")
-#rownames(bkv_df)[rownames(bkv_df)=="bkv_normal_pval"]<-"BKV v. normal biopsies p-value"
-rownames(bkv_df)[rownames(bkv_df)=="new_normal_pval"]<-paste(newID, "v. normal biopsies p-value")
-rownames(bkv_df)[rownames(bkv_df)=="new_bkv_pval"]<-paste(newID, "v. BKV biopsies p-value")
+bkv_df$pval[bkv_df$pval=="new_normal_pval"]<-paste(newID, "v. normal biopsies")
+bkv_df$pval[bkv_df$pval=="new_bkv_pval"]<-paste(newID, "v. BKV biopsies")
 
 bkv_df$Interpretation <- c(new_normal_results[1], new_bkv_results[1])
 
-kable(bkv_df, row.names=TRUE, align=rep('c', 3), format="html") %>%
+kable(bkv_df, row.names=FALSE, align=rep('c', 3), format="html") %>%
            row_spec(1:nrow(bkv_df), background="white") %>% column_spec(c(1), bold=TRUE, background="whitesmoke")
 	
 ```
