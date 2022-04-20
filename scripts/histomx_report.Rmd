@@ -347,6 +347,8 @@ newPreds$cell_type_radar
 
 ```
 
+\newpage
+
 ***
 ### Clinician signout
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}

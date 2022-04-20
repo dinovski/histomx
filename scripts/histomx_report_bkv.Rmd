@@ -361,14 +361,14 @@ bkv_df <- data.frame(pval=colnames(newPreds$bkv_stats), apply(bkv_df, 1, as.char
 bkv_df <- bkv_df[bkv_df$pval %in% c("new_normal_pval", "new_bkv_pval"),]
 
 ## interpretation (if both pvalues sig)
-# alternate hypothesis=higher
+# alternate hypothesis=new > normal
 new_normal_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.05, "BKV expression is not significantly higher than normal biopsies",
-			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] < 0.01, "BKV expression is moderately higher than normal biopsies",
+			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.01 & bkv_df[1,c("BKlargeTAg", "BKVP1")] <= 0.05, "BKV expression is moderately higher than normal biopsies",
 			     "BKV expression is significantly higher than normal biopsies"))
-# alternate hypothesis=lower
-new_bkv_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] >= 0.05, "BKV expression is not signficiantly high compared to BKV biopsies",
-			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] < 0.01, "BKV expression is moderately similar to BKV biopsies",
-			     "BKV expression is signficiantly similar to normal biopsies"))
+# alternate hypothesis=new < BKV
+new_bkv_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.05, "BKV expression is not signficiantly lower than BKV biopsies",
+			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.01 & bkv_df[1,c("BKlargeTAg", "BKVP1")] <= 0.05, "BKV expression is moderately lower than BKV biopsies",
+			     "BKV expression is signficiantly lower than BKV biopsies"))
 
 ## rename results
 bkv_df$pval[bkv_df$pval=="new_normal_pval"]<-paste(newID, "v. normal biopsies")
@@ -381,6 +381,8 @@ kable(bkv_df, row.names=FALSE, align=rep('c', 3), format="html") %>%
 	
 ```
 p-values were computed using a Wilcoxon rank-sum test to compare BKV gene expression.
+
+\newpage
 
 ***
 ### Clinician signout
