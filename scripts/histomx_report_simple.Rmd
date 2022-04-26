@@ -14,6 +14,18 @@ params:
   patient_file: ''
 ---
 
+<style type="text/css">
+  body{font-size: 10pt;}
+</style>
+
+```{r, include=FALSE, eval=FALSE}
+## to run manually
+newRCC='../test_files/test.RCC'
+rmarkdown::render('../scripts/histomx_report.Rmd')
+## convert output html to paged PDF 
+system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
+```
+
 ```{r setup, include=FALSE, echo=FALSE}
 options(rgl.useNULL=TRUE)
 ## set paths in all code chunks are relative to this root.dir
@@ -27,13 +39,12 @@ library(gridExtra, quietly=TRUE)
 library(knitr, quietly=TRUE)
 opts_knit$set(eval.after = "fig.cap")
 library(kableExtra, quietly=TRUE)
-#library(xtable)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ***
 ## Molecular Pathology Platform
-> **Team leader:** Pr Alexandre Loupy MD/PhD   
+> **Team leader:** Pr Alexandre Loupy MD/PhD  
 **Project managers:** Fariza Mezine & Blaise Robin  
 **Bioinformatician:** Dina Zielinski PhD
 **Clinical reviewer:** Valentin Goutaudier MD  
@@ -64,8 +75,8 @@ outPath=paste0(newPath, '/histomx_results/')
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
 ## and return a list of these files
 newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
-newID <- gsub("-", ".", newPreds$score_table$ID)
 dev.off()
+newID <- gsub("-", ".", newPreds$score_table$ID)
 
 ## Output sequencing run info
 newQC <- rccQC(newRCC, outPath)
@@ -106,6 +117,8 @@ if(nrow(pt_df) %% 2 == 0) {
 }
 
 ```
+
+\newpage
 
 ***
 ## Gene expression based probabilities
@@ -174,16 +187,14 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
     column_spec(2, bold=TRUE, color="dodgerblue") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
-```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, ATI (Acute tubular injury without rejection), atrophy/fibrosis (isolated IFTA).
 
-\newpage
+```
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, and atrophy/fibrosis (isolated IFTA).
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## table of molecular scores
 ms_new <- data.frame(t(newPreds$score_table[,c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "iifta0_score","v0_score", "cv1_score", "ci1_score", "ct1_score")]))
-
 ## reference set quantiles
 ms_ref <- newPreds$ref_scores[,c("Dx", "g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score", "v0_score", "iifta0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
  
@@ -193,7 +204,6 @@ colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
                    "IFTA Q1", "IFTA Q3",
                    "No lesion Q1", "No lesion Q3")
 rownames(tab) <- rownames(ms_new)
-
 ## add reference biopsy molecular score ranges
 ## rows=molecular scores; columns=histo diagnosis
 for(i in 1:nrow(tab)) {
@@ -206,40 +216,31 @@ for(i in 1:nrow(tab)) {
   tab[rownames(tab)==rownames(ms_new)[i],"No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%",rownames(ms_new)[i]]
 }
-
 #tab <- tab[!is.na(colnames(tab))]
 tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
 tab$'TCMR range' <- paste(tab$`TCMR Q1`, "-", tab$`TCMR Q3`)
 tab$'IFTA range' <- paste(tab$`IFTA Q1`, "-", tab$`IFTA Q3`)
 tab$'Normal range' <- paste(tab$`No lesion Q1`, "-", tab$`No lesion Q3`)
 tab$'lesion' <- gsub("_", " ", rownames(tab))
-
 if(!all(rownames(ms_new)==rownames(tab))) {
   stop("check concordance of lesion score names between new sample and refset")
 }
-
 tab <- cbind(ms_new, tab)
-
 tab$Interpretation <- ifelse(tab[,newID]<=10,"unlikely",
                                        ifelse(tab[,newID]>10 & tab[,newID]<=20,"low probability",
                                               ifelse(tab[,newID]>20 & tab[,newID]<=40,"moderate probability",
                                                      ifelse(tab[,newID]>40 & tab[,newID]<=60,"moderate/high probability",
                                                            ifelse(tab[,newID]>60 & tab[,newID]<=80,"high probability",
                                                                   ifelse(tab[,newID]>80,"very high probability","NA"))))))
-
 ## return range for 'normal' biopsies
 ref_quantiles <- tab[,c(newID, "lesion", "Normal range", "Interpretation")]
-
 ref_quantiles$'lesion' <- gsub("0 score", " > 0", ref_quantiles$'lesion')
 ref_quantiles$'lesion' <- gsub("1 score", " > 1", ref_quantiles$'lesion')
-
 ref_quantiles <- ref_quantiles %>% relocate('lesion', .before = colnames(ref_quantiles)[1])
-
 kable(ref_quantiles, row.names=FALSE, align='c', format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
     column_spec(2, bold=TRUE, color="dodgerblue") %>%
     row_spec(c(1,3,5), background="whitesmoke") %>% row_spec(c(2,4,6), background="white")
-
 #Ranges are defined by Q1 and Q3, the upper and lower bounds of the middle 50% of the reference biopsy molecular scores for each histology based diagnosis.
 ```
 Banff lesion based scores represent the probability that a biopsy has a Banff score >0 or >1, as indicated for each lesion.  
@@ -262,7 +263,6 @@ newPreds$pca_1_2
 ```
 </div>
 
-***
 ### Histologic Diagnosis of 25 Nearest Neighbors
 ```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
 newPreds$knn_dx$Dx <- rownames(newPreds$knn_dx)
@@ -271,7 +271,15 @@ newPreds$knn_dx <- newPreds$knn_dx[,c("Dx", "Total", "Percent")]
 kable(newPreds$knn_dx, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(c(1,2,3), bold=TRUE, background="white")
 ```
-&nbsp; 
+
+```{r, echo=FALSE, warning=FALSE, results='asis', eval=FALSE}
+### Banff scores of 25 Nearest Neighbors (%)
+newPreds$knn_banff$score <- rownames(newPreds$knn_banff)
+newPreds$knn_banff <- newPreds$knn_banff[,c("score", "g", "ptc", "cg", "i", "t")]
+
+kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html") %>%
+    column_spec(c(1,2,3,4,5,6), bold=TRUE, background="white")
+```
 
 \newpage
 
