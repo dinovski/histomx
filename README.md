@@ -68,6 +68,13 @@ Running the HISTOMX command will show all possible input arguments:
 ```
 $HISTOMX
 ```
+The type of report is determined by the Markdown file used:
+```
+RMD_FILE=histomx_kidney.Rmd (standard BHOT report)
+RMD_FILE=histomx_kidney_bkv (standard BHOT report with BKV expression)
+RMD_FILE=histomx_kidney_simple (simplified report w/o pathways)
+RMD_FILE=histomx_xeno.Rmd (BPOT report)
+```
 
 The following are 2 examples (with and without patient or RNA QC files)
 ```
