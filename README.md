@@ -38,14 +38,6 @@ HISTOMX_PATH=~/Desktop/histomx-main
 HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report  
 ```
 
-The type of report is determined by the Markdown file used (choose one):
-```
-RMD_FILE=histomx_kidney.Rmd (standard BHOT report)
-RMD_FILE=histomx_kidney_bkv (standard BHOT report with BKV expression)
-RMD_FILE=histomx_kidney_simple (simplified report w/o pathways)
-RMD_FILE=histomx_xeno.Rmd (BPOT report)
-```
-
 6. Create a directory called 'refRCCs'.
 ```
 mkdir -p $HISTOMX_PATH/refRCCs
@@ -65,6 +57,15 @@ mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
 Running the HISTOMX command will show all possible input arguments:
 ```
 $HISTOMX
+```
+
+The type of report is determined by the Markdown file used (choose one):
+```
+RMD_FILE=histomx_kidney.Rmd (standard BHOT report)
+
+RMD_FILE=histomx_kidney_bkv.Rmd (standard BHOT report with BKV expression)
+RMD_FILE=histomx_kidney_simple.Rmd (simplified report w/o pathways)
+RMD_FILE=histomx_xeno.Rmd (BPOT report)
 ```
 
 The following are 2 examples (with and without patient or RNA QC files)
