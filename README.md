@@ -40,7 +40,7 @@ HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 
 6. Create a directory called 'refRCCs'.
 ```
-mkdir -p $HISTOMX_PATH/refRCCs
+mkdir -p ${HISTOMX_PATH}/refRCCs
 ```
 
 7. Download all reference RCC files from the server.  
@@ -61,11 +61,11 @@ $HISTOMX
 
 The type of report is determined by the Markdown file used (choose one):
 ```
-RMD_FILE=histomx_kidney.Rmd (standard BHOT report)
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney.Rmd (standard BHOT report)
 
-RMD_FILE=histomx_kidney_bkv.Rmd (standard BHOT report with BKV expression)
-RMD_FILE=histomx_kidney_simple.Rmd (simplified report w/o pathways)
-RMD_FILE=histomx_xeno.Rmd (BPOT report)
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_bkv.Rmd (standard BHOT report with BKV expression)
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_simple.Rmd (simplified report w/o pathways)
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_xeno.Rmd (BPOT report)
 ```
 
 The following are 2 examples (with and without patient or RNA QC files)
