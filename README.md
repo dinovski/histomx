@@ -36,16 +36,14 @@ quit(save="no")
 HISTOMX_PATH=~/Desktop/histomx-main  
 
 HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report  
+```
 
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report.Rmd
+The type of report is determined by the Markdown file used (choose one):
 ```
-NOTE: to generate a simplified report without pathways, simply set the RMD_FILE to:
-```
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report_simple.Rmd
-```
-And to show acute v. chronic active TCMR scores:
-```
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_report_tcmr.Rmd
+RMD_FILE=histomx_kidney.Rmd (standard BHOT report)
+RMD_FILE=histomx_kidney_bkv (standard BHOT report with BKV expression)
+RMD_FILE=histomx_kidney_simple (simplified report w/o pathways)
+RMD_FILE=histomx_xeno.Rmd (BPOT report)
 ```
 
 6. Create a directory called 'refRCCs'.
@@ -67,13 +65,6 @@ mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
 Running the HISTOMX command will show all possible input arguments:
 ```
 $HISTOMX
-```
-The type of report is determined by the Markdown file used:
-```
-RMD_FILE=histomx_kidney.Rmd (standard BHOT report)
-RMD_FILE=histomx_kidney_bkv (standard BHOT report with BKV expression)
-RMD_FILE=histomx_kidney_simple (simplified report w/o pathways)
-RMD_FILE=histomx_xeno.Rmd (BPOT report)
 ```
 
 The following are 2 examples (with and without patient or RNA QC files)
