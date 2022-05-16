@@ -126,11 +126,11 @@ if(nrow(pt_df) %% 2 == 0) {
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "aTCMR", "caTCMR", "IFTA")]))
 ## exclude 'normal' molecular score
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "normal", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "aTCMR", "caTCMR", "normal", "IFTA", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 #tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -142,24 +142,20 @@ rownames(tab) <- rownames(ms_new)
 
 ## rows=molecular scores; columns=histo diagnosis
 ## reference biopsy AMR molecular score ranges
-# tab[rownames(tab)=="AMR","AMR Q1"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="25%","AMR"]
-# tab[rownames(tab)=="AMR","AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%","AMR"]
-# tab[rownames(tab)=="AMR","TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%","AMR"]
-# tab[rownames(tab)=="AMR","TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%","AMR"]
-# tab[rownames(tab)=="AMR","ATI Q1"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="25%","AMR"]
-# tab[rownames(tab)=="AMR","ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%","AMR"]
 tab[rownames(tab)=="AMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","AMR"]
 tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","AMR"]
 
-## reference biopsy acute TCMR molecular score ranges
-# tab[rownames(tab)=="TCMR","AMR Q1"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="25%","TCMR"]
-# tab[rownames(tab)=="TCMR","AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%","TCMR"]
-# tab[rownames(tab)=="TCMR","TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%","TCMR"]
-# tab[rownames(tab)=="TCMR","TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%","TCMR"]
-# tab[rownames(tab)=="TCMR","ATI Q1"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="25%","TCMR"]
-# tab[rownames(tab)=="TCMR","ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%","TCMR"]
+## reference biopsy TCMR molecular score ranges
 tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
+
+## reference biopsy acute TCMR molecular score ranges
+tab[rownames(tab)=="aTCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","aTCMR"]
+tab[rownames(tab)=="aTCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","aTCMR"]
+
+## reference biopsy chronic actve TCMR molecular score ranges
+tab[rownames(tab)=="caTCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","caTCMR"]
+tab[rownames(tab)=="caTCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","caTCMR"]
 
 ## reference biopsy IFTA molecular score ranges
 tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
