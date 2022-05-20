@@ -84,7 +84,7 @@ newQC <- rccQC(newRCC, outPath)
 ```
 
 ***
-## Patient info:
+## Sample info:
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 if(!is.na(file.info(newPatient)$size)) {
