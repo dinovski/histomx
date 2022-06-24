@@ -11,10 +11,10 @@ aa_model <- get(load(paste0(modelPath, 'aa_model.rda')))
 
 ## diagnosis
 normal.model <- get(load(paste0(modelPath, 'normal_model.RData')))
-amr.model <- get(load(paste0(modelPath, 'amr_model.RData')))
-tcmr.model <- get(load(paste0(modelPath, 'tcmr_model.RData')))
-atcmr.model <- get(load(paste0(modelPath, 'atcmr_model.RData')))
-catcmr.model <- get(load(paste0(modelPath, 'catcmr_model.RData')))
+a_amr.model <- get(load(paste0(modelPath, 'a_amr_model.RData')))
+ca_amr.model <- get(load(paste0(modelPath, 'ca_amr_model.RData')))
+a_tcmr.model <- get(load(paste0(modelPath, 'a_tcmr_model.RData')))
+ca_tcmr.model <- get(load(paste0(modelPath, 'ca_tcmr_model.RData')))
 ifta.model <- get(load(paste0(modelPath, 'ifta_model.RData')))
 
 ## banff lesions
@@ -32,20 +32,24 @@ ct1_score.model <- get(load(paste0(modelPath, 'ct1_score_model.RData')))
 cv1_score.model <- get(load(paste0(modelPath, 'cv1_score_model.RData')))
 
 ## import refSet molecular scores and Dx
-mscores_all_file <- '../model_data/Xeno/counts/refset_molecular_scores_all.txt'
-mscores_aa_file <- '../model_data/Xeno/counts/refset_molecular_scores_aa.txt'
+mscores_all_file <- '../model_data/Xeno/tables/refset_molecular_scores_all.txt'
+mscores_aa_file <- '../model_data/Xeno/tables/refset_molecular_scores_aa.txt'
 
 mscores_ref <- read.table(mscores_all_file, header=TRUE, sep='\t')
 rownames(mscores_ref) <- mscores_ref$ID
-colnames(mscores_ref)[colnames(mscores_ref)=="amr"]<-"AMR"
-colnames(mscores_ref)[colnames(mscores_ref)=="tcmr"]<-"TCMR"
-colnames(mscores_ref)[colnames(mscores_ref)=="atcmr"]<-"aTCMR"
-colnames(mscores_ref)[colnames(mscores_ref)=="catcmr"]<-"caTCMR"
-colnames(mscores_ref)[colnames(mscores_ref)=="ati"]<-"ATI"
-colnames(mscores_ref)[colnames(mscores_ref)=="ifta"]<-"IFTA"
+
+## Dx labels
+dx_normal <- c("Normal or minimal changes", "Pristine", "No specific diagnosis")
+dx_a_amr <- c("Active AMR")
+dx_ca_amr <- c("Chronic (+/- active) AMR", "Chronic active AMR")
+dx_a_tcmr <- c("Acute TCMR")
+dx_ca_tcmr <- c("Chronic active TCMR")
+dx_ifta <- c("Isolated IFTA", "Unexplained IFTA")
+dx_borderline <- c("Borderline")
+dx_mixed <- c("Mixed Rejection")
 
 ## import Banff scores
-banff_ref <- read.table('../model_data/Xeno/counts/refset_banff_scores_all.txt', header=TRUE, sep='\t', stringsAsFactors=FALSE)
+banff_ref <- read.table('../model_data/Xeno/tables/refset_banff_scores_all.txt', header=TRUE, sep='\t', stringsAsFactors=FALSE)
 
 ## Define histology diagnosis categories
 dx_normal <- c("Normal or minimal changes", "Pristine", "No specific diagnosis")
@@ -162,7 +166,7 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     #write.table(countTable, file='../static/refset_raw_counts.txt', quote=F, row.names=F, sep='\t')
     
     ## load raw count table, parse newRCC, and merge counts
-    ns.data <- read.table('../model_data/Xeno/counts/refset_raw_counts.txt', sep='\t', header=TRUE, check.names=FALSE)
+    ns.data <- read.table('../model_data/Xeno/tables/refset_raw_counts.txt', sep='\t', header=TRUE, check.names=FALSE)
     ns.new <- parseRCC(newRCC)
     countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"))
     rownames(countTable) <- countTable$Name
@@ -210,57 +214,6 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## new sample(s) normalized with refSet
     new.ns.norm <- data.frame(counts=ns.norm[,newID])
     colnames(new.ns.norm) <- newID
-    
-    ##--------------------------
-    ## BKV expression: new biopsy v. normal and BKV refset samples
-    ##--------------------------
-    bk_genes <- c("BK..large.T.Ag", "BK..VP1")
-    norm_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_normal,])
-    bk_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% c("NBKv"),])
-      
-    bk_counts <- data.frame(ns.norm[,colnames(ns.norm) %in% c(norm_bx_ids, bk_bx_ids, newID)], check.names=FALSE)
-    bk_counts <- bk_counts[rownames(bk_counts) %in% bk_genes,]
-    rownames(bk_counts) <- gsub(".", "", rownames(bk_counts), fixed=TRUE)
-    
-    bkv_tab <- data.frame(normal_median=apply(bk_counts[,colnames(bk_counts) %in% norm_bx_ids], 1, function(x) { median(x, na.rm=TRUE) }),
-                normal_sd=apply(bk_counts[,colnames(bk_counts) %in% norm_bx_ids], 1, function(x) { sd(x, na.rm=TRUE) }),
-                bkv_median=apply(bk_counts[,!colnames(bk_counts) %in% bk_bx_ids], 1, function(x) { median(x, na.rm=TRUE) }),
-                bkv_sd=apply(bk_counts[,colnames(bk_counts) %in% bk_bx_ids], 1, function(x) { sd(x, na.rm=TRUE) }),
-                new_counts=bk_counts[,colnames(bk_counts) %in% newID])
-    bkv_tab <- data.frame(apply(bkv_tab, 2, round, digits=3), check.names = FALSE)
-    
-    #new counts > ref_median +/- n*SD(normal counts)
-    #bkv_tab$upper_sd <- bkv_tab$ref_median + 3*bkv_tab$ref_sd
-    #bkv_tab$lower_sd <- bkv_tab$ref_median - 3*bkv_tab$ref_sd
-    #bkv_tab <- bkv_tab[bkv_tab$new_counts>bkv_tab$upper_sd | bkv_tab$new_counts<bkv_tab$lower_sd,]
-    
-    ## boxplot
-    dat <- data.frame(t(bk_counts), check.names=TRUE)
-    dat$group <- ifelse(rownames(dat) %in% norm_bx_ids, "normal",
-                        ifelse(rownames(dat) %in% bk_bx_ids, "BKV",
-                               ifelse(rownames(dat) %in% newID, newID, rownames(dat))))
-    dat$group <- factor(dat$group, levels=c("normal", "BKV", newID))
-    suppressWarnings({dat.m <- reshape2::melt(dat, id.vars="group")})
-    bkv_boxplot <- ggplot(dat.m, aes(x = forcats::fct_rev(group), y = value, fill=group)) + geom_boxplot() +
-      xlab("") + ylab("normalized expression") +
-      scale_fill_manual(values=c("blue3",  "lightsteelblue", "orange")) + 
-      theme(legend.position="none", panel.border=element_rect(colour="gray", fill=NA, size=1),
-            axis.text=element_text(size=16, color="black"), axis.title=element_text(size=16, color="black"),
-            panel.background=element_blank(), panel.grid.minor=element_line(colour="gray"))
-    
-    ## Wilcoxon rank sum test
-    ## BK VP1
-    vp1_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
-    vp1_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("BKV"),"BKVP1"], paired=FALSE, alternative="less")$p.value
-    vp1_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
-    # BK large T Ag
-    tag_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
-    tag_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("BKV"),"BKlargeTAg"], paired=FALSE, alternative="less")$p.value
-    tag_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
-    
-    bkv_tab$new_normal_pval <- formatC(c(vp1_new_norm_pval, tag_new_norm_pval), format="e", digits=3)
-    bkv_tab$new_bkv_pval <- formatC(c(vp1_new_bkv_pval, tag_new_bkv_pval), format="e", digits=3)
-    bkv_tab$bkv_normal_pval <- formatC(c(vp1_bkv_norm_pval, tag_bkv_norm_pval), format="e", digits=3)
     
     ##--------------------------
     ## signaling pathways
@@ -509,76 +462,76 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     colnames(new.normal.pred)<-c("normal", "ID")
   
     ##--------------------------
-    ## predict AMR prob for new sample(s)
+    ## predict active AMR prob for new sample(s)
     #amr.genes <- rownames(amr.model$scaling) #LDA
-    amr.genes <- names(amr.model$coefficients)[-1] #LR
+    a_amr.genes <- names(a_amr.model$coefficients)[-1] #LR
   
     new.ge <- new.ns.norm
     new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% amr.genes]
+    new.ge <- new.ge[,colnames(new.ge) %in% a_amr.genes]
   
     #new.amr.pred <- predict(amr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.amr.pred <- predict(amr.model, newdata=data.frame(t(new.ge)), type="response")
+    new.a_amr.pred <- predict(a_amr.model, newdata=data.frame(t(new.ge)), type="response")
   
-    new.amr.pred <- data.frame(new.amr.pred)
+    new.a_amr.pred <- data.frame(new.a_amr.pred)
     #new.amr.pred$ID <- rownames(new.amr.pred)
-    new.amr.pred$ID <- newID
+    new.a_amr.pred$ID <- newID
     #new.amr.pred$other <- NULL #LDA
-    colnames(new.amr.pred)<-c("amr", "ID")
-  
-    ##--------------------------
-    ## predict TCMR prob for new sample(s)
-    #tcmr.genes <- rownames(tcmr.model$scaling) #LDA
-    tcmr.genes <- names(tcmr.model$coefficients)[-1] #LR
-  
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% tcmr.genes]
-  
-    #new.tcmr.pred <- predict(tcmr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.tcmr.pred <- predict(tcmr.model, newdata=data.frame(t(new.ge)), type="response")
-  
-    new.tcmr.pred <- data.frame(new.tcmr.pred)
-    #new.tcmr.pred$ID <- rownames(new.tcmr.pred)
-    new.tcmr.pred$ID <- newID
-    #new.tcmr.pred$other <- NULL #LDA
-    colnames(new.tcmr.pred)<-c("tcmr", "ID")
+    colnames(new.a_amr.pred)<-c("a_amr", "ID")
     
     ##--------------------------
-    ## predict acute TCMR prob for new sample(s)
-    #atcmr.genes <- rownames(atcmr.model$scaling) #LDA
-    atcmr.genes <- names(atcmr.model$coefficients)[-1] #LR
+    ## predict chronic active AMR prob for new sample(s)
+    #amr.genes <- rownames(amr.model$scaling) #LDA
+    ca_amr.genes <- names(ca_amr.model$coefficients)[-1] #LR
     
     new.ge <- new.ns.norm
     new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% atcmr.genes]
+    new.ge <- new.ge[,colnames(new.ge) %in% ca_amr.genes]
     
-    #new.atcmr.pred <- predict(atcmr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.atcmr.pred <- predict(atcmr.model, newdata=data.frame(t(new.ge)), type="response")
+    #new.amr.pred <- predict(amr.model, newdata=new.ge, type="prob")$posterior #LDA
+    new.ca_amr.pred <- predict(ca_amr.model, newdata=data.frame(t(new.ge)), type="response")
     
-    new.atcmr.pred <- data.frame(new.atcmr.pred)
-    #new.atcmr.pred$ID <- rownames(new.atcmr.pred)
-    new.atcmr.pred$ID <- newID
-    #new.atcmr.pred$other <- NULL #LDA
-    colnames(new.atcmr.pred)<-c("atcmr", "ID")
+    new.ca_amr.pred <- data.frame(new.ca_amr.pred)
+    #new.amr.pred$ID <- rownames(new.amr.pred)
+    new.ca_amr.pred$ID <- newID
+    #new.amr.pred$other <- NULL #LDA
+    colnames(new.ca_amr.pred)<-c("ca_amr", "ID")
   
     ##--------------------------
     ## predict acute TCMR prob for new sample(s)
-    #catcmr.genes <- rownames(catcmr.model$scaling) #LDA
-    catcmr.genes <- names(catcmr.model$coefficients)[-1] #LR
+    #a_tcmr.genes <- rownames(a_tcmr.model$scaling) #LDA
+    a_tcmr.genes <- names(a_tcmr.model$coefficients)[-1] #LR
+  
+    new.ge <- new.ns.norm
+    new.ge <- t(new.ge)
+    new.ge <- new.ge[,colnames(new.ge) %in% a_tcmr.genes]
+  
+    #new.a_tcmr.pred <- predict(a_tcmr.model, newdata=new.ge, type="prob")$posterior #LDA
+    new.a_tcmr.pred <- predict(a_tcmr.model, newdata=data.frame(t(new.ge)), type="response")
+  
+    new.a_tcmr.pred <- data.frame(new.a_tcmr.pred)
+    #new.a_tcmr.pred$ID <- rownames(new.a_tcmr.pred)
+    new.a_tcmr.pred$ID <- newID
+    #new.a_tcmr.pred$other <- NULL #LDA
+    colnames(new.a_tcmr.pred)<-c("a_tcmr", "ID")
+    
+    ##--------------------------
+    ## predict chronic active TCMR prob for new sample(s)
+    #ca_tcmr.genes <- rownames(ca_tcmr.model$scaling) #LDA
+    ca_tcmr.genes <- names(ca_tcmr.model$coefficients)[-1] #LR
     
     new.ge <- new.ns.norm
     new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% catcmr.genes]
+    new.ge <- new.ge[,colnames(new.ge) %in% ca_tcmr.genes]
     
-    #new.catcmr.pred <- predict(catcmr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.catcmr.pred <- predict(catcmr.model, newdata=data.frame(t(new.ge)), type="response")
+    #new.ca_tcmr.pred <- predict(ca_tcmr.model, newdata=new.ge, type="prob")$posterior #LDA
+    new.ca_tcmr.pred <- predict(ca_tcmr.model, newdata=data.frame(t(new.ge)), type="response")
     
-    new.catcmr.pred <- data.frame(new.catcmr.pred)
-    #new.catcmr.pred$ID <- rownames(new.catcmr.pred)
-    new.catcmr.pred$ID <- newID
-    #new.catcmr.pred$other <- NULL #LDA
-    colnames(new.catcmr.pred)<-c("catcmr", "ID")
+    new.ca_tcmr.pred <- data.frame(new.ca_tcmr.pred)
+    #new.ca_tcmr.pred$ID <- rownames(new.ca_tcmr.pred)
+    new.ca_tcmr.pred$ID <- newID
+    #new.ca_tcmr.pred$other <- NULL #LDA
+    colnames(new.ca_tcmr.pred)<-c("ca_tcmr", "ID")
   
     ##--------------------------
     ## predict IFTA prob for new sample(s)
@@ -760,20 +713,15 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##-------------------------------------
     ## score table
     options(scipen = 999)
-    join_list <- list(new.normal.pred, new.amr.pred, new.ifta.pred,
-                      new.tcmr.pred, new.atcmr.pred, new.catcmr.pred, 
+    join_list <- list(new.normal.pred, new.ifta.pred,
+    		      new.a_amr.pred, new.ca_amr.pred,
+                      new.a_tcmr.pred, new.ca_tcmr.pred,
                       new.g.pred, new.ptc.pred, new.i.pred, new.t.pred, #ordinal
                       new.cg0.pred, new.iifta0.pred, new.v0.pred,
                       new.cv1.pred, new.ci1.pred, new.ct1.pred)
     tab <- Reduce(function(...) merge(..., all=TRUE), join_list)
     rownames(tab) <- tab$ID
-  
-    colnames(tab)[colnames(tab)=="amr"]<-"AMR"
-    colnames(tab)[colnames(tab)=="tcmr"]<-"TCMR"
-    colnames(tab)[colnames(tab)=="atcmr"]<-"aTCMR"
-    colnames(tab)[colnames(tab)=="catcmr"]<-"caTCMR"
-    colnames(tab)[colnames(tab)=="ifta"]<-"IFTA"
-  
+    
     mscores_new <- tab ## save scores before calculating %
     #tab <- data.frame(apply(tab[,-1], 2, function(x) {round(x, 3)*100})) #multiple samples
     tab <- data.frame(round(tab[-1], 3) *100) #single sample
@@ -789,7 +737,7 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##-----------------------
     ## output IQR and median scores by Dx for reference biopsies
-    scores_keep <- c("AMR", "TCMR", "aTCMR", "caTCMR", "IFTA", "normal",
+    scores_keep <- c("a_amr", "ca_amr", "a_tcmr", "ca_tcmr", "ifta", "normal",
                      "g0", "g1", "g2", "g3", "ptc0", "ptc1", "ptc2", "ptc3",
                      "i1", "i2", "i3", "t0", "t1", "t2", "t3",
                      "cg0_score", "iifta0_score", "v0_score",
@@ -799,26 +747,38 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     #ref.tab <- ref.tab[apply(ref.tab[,-1], 1, function(x) { all(!is.na(x)) }),] #exclude samples without all molecular scores
   
     ## simplify Dx
-    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_amr, "AMR", ref.tab$Dx)
-    #ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_tcmr, "TCMR", ref.tab$Dx)
+    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_a_amr, "aAMR", ref.tab$Dx)
+    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_ca_amr, "caAMR", ref.tab$Dx)
+    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_a_tcmr, "aTCMR", ref.tab$Dx)
+    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_ca_tcmr, "caTCMR", ref.tab$Dx)
     ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_normal, "No specific Dx", ref.tab$Dx)
     ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_ifta, "IFTA", ref.tab$Dx)
   
     ## IQR = Q3 - Q1
     ## Q0= min and Q5=max
-    ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx=="AMR",scores_keep], 2, quantile, na.rm=TRUE)
-    ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx %in% dx_tcmr,scores_keep], 2, quantile, na.rm=TRUE)
+    ref.a_amr.quantiles <- apply(ref.tab[ref.tab$Dx=="aAMR",scores_keep], 2, quantile, na.rm=TRUE)
+    ref.ca_amr.quantiles <- apply(ref.tab[ref.tab$Dx=="caAMR",scores_keep], 2, quantile, na.rm=TRUE)
+    ref.a_tcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="aTCMR",scores_keep], 2, quantile, na.rm=TRUE)
+    ref.ca_tcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="caTCMR",scores_keep], 2, quantile, na.rm=TRUE)
     ref.ifta.quantiles <- apply(ref.tab[ref.tab$Dx=="IFTA",scores_keep], 2, quantile, na.rm=TRUE)
     ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx=="No specific Dx",scores_keep], 2, quantile, na.rm=TRUE)
   
-    ref.amr.quantiles <- data.frame(apply(ref.amr.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.amr.quantiles$Dx <- "AMR"
-    ref.amr.quantiles$Q <- rownames(ref.amr.quantiles)
+    ref.a_amr.quantiles <- data.frame(apply(ref.a_amr.quantiles, 2, function(x) {round(x, 3)*100}))
+    ref.a_amr.quantiles$Dx <- "aAMR"
+    ref.a_amr.quantiles$Q <- rownames(ref.a_amr.quantiles)
   
-    ref.tcmr.quantiles <- data.frame(apply(ref.tcmr.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.tcmr.quantiles$Dx <- "TCMR"
-    ref.tcmr.quantiles$Q <- rownames(ref.tcmr.quantiles)
+    ref.ca_amr.quantiles <- data.frame(apply(ref.ca_amr.quantiles, 2, function(x) {round(x, 3)*100}))
+    ref.ca_amr.quantiles$Dx <- "caAMR"
+    ref.ca_amr.quantiles$Q <- rownames(ref.ca_amr.quantiles)
+    
+    ref.a_tcmr.quantiles <- data.frame(apply(ref.a_tcmr.quantiles, 2, function(x) {round(x, 3)*100}))
+    ref.a_tcmr.quantiles$Dx <- "aTCMR"
+    ref.a_tcmr.quantiles$Q <- rownames(ref.a_tcmr.quantiles)
   
+    ref.ca_tcmr.quantiles <- data.frame(apply(ref.ca_tcmr.quantiles, 2, function(x) {round(x, 3)*100}))
+    ref.ca_tcmr.quantiles$Dx <- "caTCMR"
+    ref.ca_tcmr.quantiles$Q <- rownames(ref.ca_tcmr.quantiles)
+    
     ref.ifta.quantiles <- data.frame(apply(ref.ifta.quantiles, 2, function(x) {round(x, 3)*100}))
     ref.ifta.quantiles$Dx <- "IFTA"
     ref.ifta.quantiles$Q <- rownames(ref.ifta.quantiles)
@@ -826,28 +786,16 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     ref.normal.quantiles <- data.frame(apply(ref.normal.quantiles, 2, function(x) {round(x, 3)*100}))
     ref.normal.quantiles$Dx <- "No specific Dx"
     ref.normal.quantiles$Q <- rownames(ref.normal.quantiles)
-  
-    ## separate acute and caTCMR
-    ref.atcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="Acute TCMR",scores_keep], 2, quantile, na.rm=TRUE)
-    ref.catcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="Chronic active TCMR",scores_keep], 2, quantile, na.rm=TRUE)
     
-    ref.atcmr.quantiles <- data.frame(apply(ref.atcmr.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.atcmr.quantiles$Dx <- "aTCMR"
-    ref.atcmr.quantiles$Q <- rownames(ref.atcmr.quantiles)
-    
-    ref.catcmr.quantiles <- data.frame(apply(ref.catcmr.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.catcmr.quantiles$Dx <- "caTCMR"
-    ref.catcmr.quantiles$Q <- rownames(ref.catcmr.quantiles)
-    
-    ref.score.quantiles <- rbind(ref.amr.quantiles, ref.tcmr.quantiles, ref.ifta.quantiles, ref.normal.quantiles,
-                                 ref.atcmr.quantiles, ref.catcmr.quantiles)
+    ref.score.quantiles <- rbind(ref.normal.quantiles, ref.ifta.quantiles,
+    				ref.a_amr.quantiles, ref.ca_amr.quantiles,
+    				ref.a_tcmr.quantiles, ref.ca_tcmr.quantiles)
     #write.table(ref.score.quantiles, file=paste0(newOut, "/refset_score_quantiles", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
   
     ##--------------------------
     ## combine refset and new molecular scores
     ## scores to input to PCA
-    #pca_scores <- c("normal", "AMR", "aTCMR", "IFTA")
-    pca_scores <- c("normal", "AMR", "aTCMR", "IFTA")
+    pca_scores <- c("normal", "a_amr", "ca_amr", "a_tcmr", "ca_tcmr", "ifta")
     #pca_scores <- c("g0_score", "ptc0_score", "cg0_score", "i1_score", "t1_score")
     
     ## keep only Bx with all molecular scores
@@ -862,12 +810,13 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
   
     pca.df <- merge(pca.df, mscores_ref[,c("ID", "Dx")], by="ID", all.x=TRUE)
     pca.df$Dx <- ifelse(pca.df$ID %in% mscores_new$ID, "new", pca.df$Dx)
-  
+    #table(pca.df$Dx)
+    
     ## higlight new biopsy
     pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx!="new", "ref", "new"))
   
     ## simple Dx
-    pca.df$Dx <- ifelse(pca.df$Dx %in% c("Chronic (+/- active) AMR"), "Chronic active AMR", pca.df$Dx)
+    #pca.df$Dx <- ifelse(pca.df$Dx %in% c("Chronic (+/- active) AMR"), "Chronic active AMR", pca.df$Dx)
     #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_amr, "AMR", pca.df$Dx)
     #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_tcmr, "TCMR", pca.df$Dx)
     pca.df$Dx <- ifelse(pca.df$Dx %in% dx_normal, "No specific Dx", pca.df$Dx)
@@ -928,8 +877,8 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
     knn_tab$ID <- rownames(knn_tab)
     knn_tab <- merge(knn_tab, pca.df[,c("ID", "Dx", "ref")], by="ID")
   
-    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("normal", "AMR", "aTCMR", "IFTA", "ID", "Dx")]
-    test_new <- knn_tab[knn_tab$ref %in% "new",c("normal", "AMR", "aTCMR", "IFTA")]
+    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("normal", "a_amr", "ca_amr", "a_tcmr", "ca_tcmr", "ifta", "ID", "Dx")]
+    test_new <- knn_tab[knn_tab$ref %in% "new",c("normal", "a_amr", "ca_amr", "a_tcmr", "ca_tcmr", "ifta")]
     #train_ref <- knn_tab[knn_tab$ref=="ref",c("cg", "g", "ptc", "i", "t", "ID", "Dx")]
     #test_new <- knn_tab[knn_tab$ref=="new",c("cg0", "g0", "ptc0", "i1", "t1")]
   
@@ -1116,9 +1065,7 @@ XenoPred <- function(newRCC, outPath, saveFiles=FALSE) {
               pathways=pathway_table,
               pathway_radar=pathway_radar,
               cell_types=cell_type_table,
-              cell_type_radar=cell_type_radar,
-              bkv_plot=bkv_boxplot,
-              bkv_stats=bkv_tab)
+              cell_type_radar=cell_type_radar)
           )
   
 }

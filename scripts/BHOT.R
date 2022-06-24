@@ -1,6 +1,6 @@
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "ordinal", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")

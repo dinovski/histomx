@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.7"
+title: "&nbsp;v1.8"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -21,7 +21,7 @@ params:
 ```{r, include=FALSE, eval=FALSE}
 ## to run manually
 newRCC='../test_files/test.RCC'
-rmarkdown::render('../scripts/histomx_report.Rmd')
+rmarkdown::render('../scripts/histomx_kidney.Rmd')
 ## convert output html to paged PDF 
 system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
 ```
@@ -75,7 +75,7 @@ outPath=paste0(newPath, '/histomx_results/')
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
 ## and return a list of these files
 newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
-dev.off()
+#dev.off()
 newID <- gsub("-", ".", newPreds$score_table$ID)
 
 ## Output sequencing run info
@@ -126,11 +126,10 @@ if(nrow(pt_df) %% 2 == 0) {
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA")]))
-## exclude 'normal' molecular score
+ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA", "OTHER")]))
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "normal", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "OTHER", "IFTA", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
 #tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
@@ -152,18 +151,16 @@ tab[rownames(tab)=="AMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" &
 tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","AMR"]
 
 ## reference biopsy acute TCMR molecular score ranges
-# tab[rownames(tab)=="TCMR","AMR Q1"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="25%","TCMR"]
-# tab[rownames(tab)=="TCMR","AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%","TCMR"]
-# tab[rownames(tab)=="TCMR","TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%","TCMR"]
-# tab[rownames(tab)=="TCMR","TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%","TCMR"]
-# tab[rownames(tab)=="TCMR","ATI Q1"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="25%","TCMR"]
-# tab[rownames(tab)=="TCMR","ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
 tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
 
 ## reference biopsy IFTA molecular score ranges
 tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
 tab[rownames(tab)=="IFTA","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","IFTA"]
+
+## reference biopsy OTHER molecular score ranges
+tab[rownames(tab)=="OTHER","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","OTHER"]
+tab[rownames(tab)=="OTHER","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","OTHER"]
 
 tab <- tab[!is.na(colnames(tab))]
 #tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
@@ -176,6 +173,7 @@ tab$'Diagnosis' <- rownames(tab)
 dx_tab <- cbind(ms_new, tab[,c("Diagnosis", "Normal range")])
 dx_tab <- dx_tab %>% relocate('Diagnosis', .before = colnames(dx_tab)[1])
 
+#TODO: scale probabilities relative to normal biopsies (eg. +/- SD)
 dx_tab$Interpretation <- ifelse(dx_tab[,newID]<=10,"unlikely",
                                        ifelse(dx_tab[,newID]>10 & dx_tab[,newID]<=20,"low probability",
                                               ifelse(dx_tab[,newID]>20 & dx_tab[,newID]<=40,"moderate probability",
@@ -230,11 +228,14 @@ The above Banff lesion based scores represent the probability for each score and
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 ## table of molecular scores
-ms_new <- data.frame(t(newPreds$score_table[,c("cg0_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score")]))
+ms_new <- data.frame(t(newPreds$score_table[,c("cg0_binary", "iifta0_binary", "v0_binary", "cv1_binary", "ci1_binary", "ct1_binary")]))
+rownames(ms_new) <- gsub("\\_binary", "", rownames(ms_new))
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "cg0_score", "iifta0_score", "v0_score", "cv1_score", "ci1_score", "ct1_score", "Q")]
- 
+ms_ref <- newPreds$ref_scores[,c("Dx", "cg0_binary", "iifta0_binary", "v0_binary", "cv1_binary", "ci1_binary", "ct1_binary", "Q")]
+colnames(ms_ref) <- gsub("\\_binary", "", colnames(ms_ref))
+ms_ref <- ms_ref[ms_ref$Dx != "OTHER",]
+
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
 colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
@@ -277,8 +278,8 @@ tab$Interpretation <- ifelse(tab[,newID]<=10,"unlikely",
 ## return range for 'normal' biopsies
 ref_quantiles <- tab[,c(newID, "lesion", "Normal range", "Interpretation")]
 
-ref_quantiles$'lesion' <- gsub("0 score", " > 0", ref_quantiles$'lesion')
-ref_quantiles$'lesion' <- gsub("1 score", " > 1", ref_quantiles$'lesion')
+ref_quantiles$'lesion' <- gsub("0", " > 0", ref_quantiles$'lesion')
+ref_quantiles$'lesion' <- gsub("1", " > 1", ref_quantiles$'lesion')
 
 ref_quantiles <- ref_quantiles %>% relocate('lesion', .before = colnames(ref_quantiles)[1])
 #ref_quantiles <- ref_quantiles[order(ref_quantiles[,newID], decreasing=TRUE),]
@@ -323,6 +324,7 @@ kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html")
 ```
 
 \newpage
+
 ***
 ### Pathway analysis
 ```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the # of enriched genes; % = genes associated with the pathway).'}
