@@ -61,11 +61,12 @@ $HISTOMX
 
 The type of report is determined by the Markdown file used (choose one):
 ```
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney.Rmd (standard BHOT report)
-
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_bkv.Rmd (standard BHOT report with BKV expression)
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_simple.Rmd (simplified report w/o pathways)
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_xeno.Rmd (BPOT report)
+# standard BHOT report:
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney.Rmd
+# standard BHOT report with BKV expressio
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_bkv.Rmd
+# simplified report w/o pathways
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_simple.Rmd
 ```
 
 The following are 2 examples (with and without patient or RNA QC files)
