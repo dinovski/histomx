@@ -63,9 +63,9 @@ The type of report is determined by the Markdown file used (choose one):
 ```
 # standard BHOT report:
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney.Rmd
-# standard BHOT report with BKV expressio
+# standard BHOT report with BKV expression
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_bkv.Rmd
-# simplified report w/o pathways
+# simplified report w/o pathways and with only binary lesions
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_simple.Rmd
 ```
 
