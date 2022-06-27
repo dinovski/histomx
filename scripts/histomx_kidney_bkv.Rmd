@@ -367,6 +367,7 @@ newPreds$bkv_plot
 bkv_df <- newPreds$bkv_stats
 bkv_df <- data.frame(pval=colnames(newPreds$bkv_stats), apply(bkv_df, 1, as.character))
 bkv_df <- bkv_df[bkv_df$pval %in% c("new_normal_pval", "new_bkv_pval"),]
+bkv_df$BKVP1 <- as.numeric(bkv_df$BKVP1)
 
 ## interpretation (if both pvalues sig)
 # alternate hypothesis=new > normal
