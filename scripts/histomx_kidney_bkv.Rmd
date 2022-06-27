@@ -21,7 +21,7 @@ params:
 ```{r, include=FALSE, eval=FALSE}
 ## to run manually
 newRCC='../test_files/test.RCC'
-rmarkdown::render('../scripts/histomx_kidney.Rmd')
+rmarkdown::render('../scripts/histomx_kidney_bkv.Rmd')
 ## convert output html to paged PDF 
 system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
 ```
@@ -365,27 +365,8 @@ newPreds$bkv_plot
 
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
 bkv_df <- newPreds$bkv_stats
-bkv_df <- data.frame(pval=colnames(newPreds$bkv_stats), apply(bkv_df, 1, as.character))
-bkv_df <- bkv_df[bkv_df$pval %in% c("new_normal_pval", "new_bkv_pval"),]
-bkv_df$BKVP1 <- as.numeric(bkv_df$BKVP1)
 
-## interpretation (if both pvalues sig)
-# alternate hypothesis=new > normal
-new_normal_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.05, "BKV expression is not significantly higher than normal biopsies",
-			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.01 & bkv_df[1,c("BKlargeTAg", "BKVP1")] <= 0.05, "BKV expression is moderately higher than normal biopsies",
-			     "BKV expression is significantly higher than normal biopsies"))
-# alternate hypothesis=new < BKV
-new_bkv_results <- ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.05, "BKV expression is not signficiantly lower than BKV biopsies",
-			     ifelse(bkv_df[1,c("BKlargeTAg", "BKVP1")] > 0.01 & bkv_df[1,c("BKlargeTAg", "BKVP1")] <= 0.05, "BKV expression is moderately lower than BKV biopsies",
-			     "BKV expression is signficiantly lower than BKV biopsies"))
-
-## rename results
-bkv_df$pval[bkv_df$pval=="new_normal_pval"]<-paste(newID, "v. normal biopsies")
-bkv_df$pval[bkv_df$pval=="new_bkv_pval"]<-paste(newID, "v. BKV biopsies")
-
-bkv_df$Interpretation <- c(new_normal_results[1], new_bkv_results[1])
-
-kable(bkv_df, row.names=FALSE, align=rep('c', 3), format="html") %>%
+kable(bkv_df, row.names=T, align=rep('c', 3), format="html") %>%
            row_spec(1:nrow(bkv_df), background="white") %>% column_spec(c(1), bold=TRUE, background="whitesmoke")
 	
 ```

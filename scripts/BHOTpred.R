@@ -236,10 +236,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ## boxplot
     dat <- data.frame(t(bk_counts), check.names=TRUE)
+    dat[] <- sapply(dat[], as.numeric)
+    #dat$BK_mean <- apply(dat[,1:2], 1, mean)
+    
     dat$group <- ifelse(rownames(dat) %in% norm_bx_ids, "normal",
                         ifelse(rownames(dat) %in% bk_bx_ids, "BKV",
-                               ifelse(rownames(dat) %in% newID, newID, rownames(dat))))
-    dat$group <- factor(dat$group, levels=c("normal", "BKV", newID))
+                               ifelse(rownames(dat) %in% newID, "new", rownames(dat))))
+    dat$group <- factor(dat$group, levels=c("normal", "BKV", "new"))
     suppressWarnings({dat.m <- reshape2::melt(dat, id.vars="group")})
     bkv_boxplot <- ggplot(dat.m, aes(x = forcats::fct_rev(group), y = value, fill=group)) + geom_boxplot() +
       xlab("") + ylab("normalized expression") +
@@ -249,19 +252,56 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
             panel.background=element_blank(), panel.grid.minor=element_line(colour="gray"))
 
     ## Wilcoxon rank sum test
+    new_exp <- c(dat[dat$group %in% c("new"),"BKVP1"], dat[dat$group %in% c("new"),"BKlargeTAg"])
+    bkv_exp <- c(dat[dat$group %in% c("BKV"),"BKVP1"], dat[dat$group %in% c("BKV"),"BKlargeTAg"])
+    norm_exp <- c(dat[dat$group %in% c("normal"),"BKVP1"], dat[dat$group %in% c("normal"),"BKlargeTAg"])
+    
+    new_greater_norm_pval <- wilcox.test(new_exp, norm_exp, paired=FALSE, alternative="greater")$p.value
+    new_greater_bkv_pval <- wilcox.test(new_exp, bkv_exp, paired=FALSE, alternative="greater")$p.value
+    new_less_bkv_pval <- wilcox.test(new_exp, bkv_exp, paired=FALSE, alternative="less")$p.value
+    
     ## BK VP1
-    vp1_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
-    vp1_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("BKV"),"BKVP1"], paired=FALSE, alternative="less")$p.value
-    vp1_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
+    # vp1_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
+    # vp1_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("BKV"),"BKVP1"], paired=FALSE, alternative="less")$p.value
+    # vp1_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
     # BK large T Ag
-    tag_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
-    tag_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("BKV"),"BKlargeTAg"], paired=FALSE, alternative="less")$p.value
-    tag_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
+    # tag_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
+    # tag_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("BKV"),"BKlargeTAg"], paired=FALSE, alternative="less")$p.value
+    # tag_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
+   
+    # interpretation (for molecualr report)
+    # alternate hypothesis=new > normal
+    new_greater_normal_results <- ifelse(new_greater_norm_pval > 0.05, "BKV expression is not significantly higher than normal biopsies",
+    				     ifelse(new_greater_norm_pval > 0.01 & new_greater_norm_pval <= 0.05, "BKV expression is moderately higher than normal biopsies",
+    				            "BKV expression is significantly higher than normal biopsies"))
+    
+    # alternate hypothesis=new > BKV
+    new_greater_bkv_results <- ifelse(new_greater_bkv_pval > 0.05, "BKV expression is not signficiantly higher than BKV biopsies",
+    				  ifelse(new_greater_bkv_pval > 0.01 & new_greater_bkv_pval <= 0.05, "BKV expression is moderately higher than BKV biopsies",
+    				         "BKV expression is signficiantly higher than BKV biopsies"))
+    
+    # alternate hypothesis=new < BKV
+    new_less_bkv_results <- ifelse(new_less_bkv_pval > 0.05, "BKV expression is not signficiantly lower than BKV biopsies",
+    			       ifelse(new_less_bkv_pval > 0.01 & new_less_bkv_pval <= 0.05, "BKV expression is moderately lower than BKV biopsies",
+    			              "BKV expression is signficiantly lower than BKV biopsies"))
+    
+    if (median(new_exp) > median(bkv_exp)){
+    	bkv_tab <- data.frame(new_greater_norm_pval=formatC(new_greater_norm_pval, format="e", digits=3),
+    			      new_greater_bkv_pval=formatC(new_greater_bkv_pval, format="e", digits=3))
+    	bkv_tab <- data.frame(pval=t(bkv_tab), check.names=F)
+    	rownames(bkv_tab) <- c("new v. normal", "new v. BKV")
+    	bkv_tab$Interpretation <- c(new_greater_normal_results, new_greater_bkv_results)
+    } else {
+    	bkv_tab <- data.frame(new_greater_norm_pval=formatC(new_greater_norm_pval, format="e", digits=3),
+    			      new_less_bkv_pval=formatC(new_less_bkv_pval, format="e", digits=3))
+    	bkv_tab <- data.frame(pval=t(bkv_tab), check.names=F)
+    	rownames(bkv_tab) <- c("new v. normal", "new v. BKV")
+    	bkv_tab$Interpretation <- c(new_greater_normal_results, new_less_bkv_results)
+    }
+    
 
-    bkv_tab$new_normal_pval <- formatC(c(vp1_new_norm_pval, tag_new_norm_pval), format="e", digits=3)
-    bkv_tab$new_bkv_pval <- formatC(c(vp1_new_bkv_pval, tag_new_bkv_pval), format="e", digits=3)
-    bkv_tab$bkv_normal_pval <- formatC(c(vp1_bkv_norm_pval, tag_bkv_norm_pval), format="e", digits=3)
 
+    
     ##--------------------------
     ## signaling pathways
     ##--------------------------
