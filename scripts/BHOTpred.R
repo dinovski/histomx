@@ -95,7 +95,7 @@ refRCC <- refRCC[!basename(refRCC) %in% pedRCC[,1]]
 
 #newRCC='../test_files/test.RCC'
 #outPath='~/Downloads/'
-#preds<-dBHOTpred(newRCC, outPath)
+#preds<-BHOTpred(newRCC, outPath)
 
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
@@ -148,15 +148,9 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #ns.data <- parseRCC(RCCfiles)
     #countTable <- ns.data$counts
     #rownames(countTable) <- countTable$Name
-    ## rename newID if also exists in refset sample names: rownames(mscores_ref)
-    #samp_ind <- grep(newID, colnames(countTable))
-    #if (length(samp_ind) > 1) {
-    #  colnames(countTable)[samp_ind][1]<-newID
-    #  colnames(countTable)[samp_ind][2]<-"histomx-new"
-    #}
     ## keep only samples used in classifiers: eventually exclude unused RCC files from final repo
     #countTable <- countTable[,colnames(countTable) %in% c("CodeClass", "Name", "Accession", rownames(mscores_ref), newID)]
-
+    
     ##------------------
     ## output raw counts for all reference samples used in classifiers
     #write.table(countTable, file='../tables/refset_raw_counts.txt', quote=F, row.names=F, sep='\t')
@@ -166,6 +160,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ns.new <- parseRCC(newRCC)
     countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"))
     rownames(countTable) <- countTable$Name
+
+    ## rename newID if also exists in refset sample names: rownames(mscores_ref)
+    samp_ind <- grep(newID, colnames(countTable))
+    if (length(samp_ind) > 1) {
+    	colnames(countTable)[samp_ind][1]<-newID
+    	colnames(countTable)[samp_ind][2]<-paste(newID, "-new")
+    }
 
     ## TODO: ruvseq
     ##------------------------
@@ -272,19 +273,19 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     # interpretation (for molecualr report)
     # alternate hypothesis=new > normal
     new_greater_normal_results <- ifelse(new_greater_norm_pval > 0.05, "BKV expression is not significantly higher than normal biopsies",
-    				     ifelse(new_greater_norm_pval > 0.01 & new_greater_norm_pval <= 0.05, "BKV expression is moderately higher than normal biopsies",
+    				     ifelse(new_greater_norm_pval > 0.01 & new_greater_norm_pval <= 0.05, "BKV expression is moderately signficiantly higher than normal biopsies",
     				            "BKV expression is significantly higher than normal biopsies"))
     
     # alternate hypothesis=new > BKV
     new_greater_bkv_results <- ifelse(new_greater_bkv_pval > 0.05, "BKV expression is not signficiantly higher than BKV biopsies",
-    				  ifelse(new_greater_bkv_pval > 0.01 & new_greater_bkv_pval <= 0.05, "BKV expression is moderately higher than BKV biopsies",
+    				  ifelse(new_greater_bkv_pval > 0.01 & new_greater_bkv_pval <= 0.05, "BKV expression is moderately signficiantly higher than BKV biopsies",
     				         "BKV expression is signficiantly higher than BKV biopsies"))
     
     # alternate hypothesis=new < BKV
     new_less_bkv_results <- ifelse(new_less_bkv_pval > 0.05, "BKV expression is not signficiantly lower than BKV biopsies",
-    			       ifelse(new_less_bkv_pval > 0.01 & new_less_bkv_pval <= 0.05, "BKV expression is moderately lower than BKV biopsies",
+    			       ifelse(new_less_bkv_pval > 0.01 & new_less_bkv_pval <= 0.05, "BKV expression is moderately signficiantly lower than BKV biopsies",
     			              "BKV expression is signficiantly lower than BKV biopsies"))
-    
+    # return pvals based on BKV expression in new sample v. BKV
     if (median(new_exp) > median(bkv_exp)){
     	bkv_tab <- data.frame(new_greater_norm_pval=formatC(new_greater_norm_pval, format="e", digits=3),
     			      new_greater_bkv_pval=formatC(new_greater_bkv_pval, format="e", digits=3))
@@ -298,9 +299,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     	rownames(bkv_tab) <- c("new v. normal", "new v. BKV")
     	bkv_tab$Interpretation <- c(new_greater_normal_results, new_less_bkv_results)
     }
-    
-
-
     
     ##--------------------------
     ## signaling pathways
