@@ -1,6 +1,6 @@
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
@@ -148,6 +148,7 @@ parseRCC <- function(rccFiles) {
     
     ## collapse raw counts to single table
     countTable <- Reduce(function(x,y) merge(x, y, all=TRUE, by=c("CodeClass", "Name", "Accession")), allCounts)
+    rownames(countTable) <- countTable$Name
     attTable <- Reduce(function(x,y) merge(x, y, all=TRUE, by=c("variable")), allAttributes)
     tot_rcc <- dim(countTable)[2] - 3 ## cols 1-3=annotation columns
     
@@ -170,7 +171,7 @@ qcAttributes <- function(attributes_table) {
     qcTab <- attributes_table[attributes_table$variable %in% c("BindingDensity", "FovCount", "FovCounted"),]
     
     ## Imaging/Field of View measure of % of requested fields of view successfully scanned in each cartridge lane
-    pct_fov <- round(as.numeric(qcTab[qcTab$variable=="FovCounted",][-1]) / as.numeric(qcTab[qcTab$variable=="FovCount",][-1]), 4)
+    pct_fov <- round(as.numeric(qcTab[qcTab$variable=="FovCounted",][-1]) / as.numeric(qcTab[qcTab$variable=="FovCount",][-1]), 4)*100
     qcTab <- rbind(qcTab, c("pct_fov", pct_fov))
     
     qcTab <- setNames(data.frame(t(qcTab[,-1])), qcTab[,1])
@@ -185,10 +186,12 @@ qcAttributes <- function(attributes_table) {
         cat(">>All samples pass Imaging QC\n")
     }
     
-    ## Binding density: 0.05 to 2.25 for MAX/FLEX instruments; 0.1-1.8 for SPRINT instruments
-    if (any(qcTab$BindingDensity < 0.05 | qcTab$BindingDensity > 2.25)) {
+    ## Binding density: number of barcodes/μm2.
+    ## recommended range is from 0.1 to 2.25 for MAX and FLEX instruments and 0.1 to 1.8 for SPRINT instruments
+    ## TODO: QC based on instrument type
+    if (any(qcTab$BindingDensity < 0.1 | qcTab$BindingDensity > 2.25)) {
         cat(">>Binding Density flag: sample(s) out of range (0.1 < BD < 2.25):\n")
-        print.data.frame(qcTab[qcTab$BindingDensity < 0.05 | qcTab$BindingDensity > 2.25,c("ID", "BindingDensity")])
+        print.data.frame(qcTab[qcTab$BindingDensity < 0.1 | qcTab$BindingDensity > 2.25,c("ID", "BindingDensity")])
         cat("\n")
     } else {
         cat(">>All samples pass Binding Density QC\n")
@@ -214,39 +217,40 @@ qcAttributes <- function(attributes_table) {
 }
 
 ##------------------------------
-## Per sample control probes quality control checks
-## TODO: output QC summary table+plots
+## Control probe quality control checks; multiple samples
+## input: rows= genes, cols=CodeClass, Name, Accession, samples...
 qcCounts <- function(count_table) {
     
     cat('---------------------------\n');
-    cat('| Quality Control metrics |\n');
+    cat('| Per sample control gene QC |\n');
     cat('---------------------------\n');
     
     samp_ids <- colnames(count_table[,!colnames(count_table) %in% c("CodeClass", "Name", "Accession")])
     endo_tab <- count_table[count_table$CodeClass=="Endogenous",c("Name", samp_ids)]
+    hk_tab <- count_table[count_table$CodeClass=="Housekeeping",c("Name", samp_ids)]
     rownames(count_table) <- count_table$Name
 
     cat('\nOverall Assay Efficiency:\n')
-    cat("(low efficiency: geometric mean of positive controls > 3x the geometric mean of endogenous genes)\n")
+    cat("(geometric mean of positive controls > 3 SD of the geometric mean of endogenous genes)\n")
     
     geo_means <- data.frame(ID=samp_ids, stringsAsFactors=FALSE)
-    geo_means$hk_mean <- rep("NA", nrow(geo_means))
-    geo_means$pos_mean <- rep("NA", nrow(geo_means))
-    geo_means$neg_mean <- rep("NA", nrow(geo_means))
-    geo_means$endo_mean <- rep("NA", nrow(geo_means))
-    geo_means$endo_sd3 <- rep("NA", nrow(geo_means))
-    
+    geo_means$endo_geo_mean <- rep("NA", nrow(geo_means))
+    geo_means$hk_geo_mean <- rep("NA", nrow(geo_means))
+    geo_means$pos_geo_mean <- rep("NA", nrow(geo_means))
+    geo_means$neg_geo_mean <- rep("NA", nrow(geo_means))
+
     for (i in 1:length(samp_ids) ) {
         sampID <- samp_ids[i]
+        endo_counts <- count_table[count_table$CodeClass=="Endogenous",][sampID][,1]
         hk_counts <- count_table[count_table$CodeClass=="Housekeeping",][sampID][,1]
         pos_counts <- count_table[count_table$CodeClass=="Positive",][sampID][,1]
         neg_counts <- count_table[count_table$CodeClass=="Negative",][sampID][,1]
-        endo_counts <- count_table[count_table$CodeClass=="Endogenous",][sampID][,1]
-        geo_means[geo_means$ID==sampID,"hk_mean"] <- round(geoMean(hk_counts), 3) # geometric mean of HK genes
-        geo_means[geo_means$ID==sampID,"pos_mean"] <- round(geoMean(pos_counts), 3) # geometric mean of positive controls
-        geo_means[geo_means$ID==sampID,"neg_mean"] <- round(geoMean(neg_counts), 3) # geometric mean of negative controls
-        geo_means[geo_means$ID==sampID,"endo_mean"] <- round(geoMean(endo_counts), 3) # geometric mean of endogenous genes
-        geo_means[geo_means$ID==sampID,"endo_sd3"] <- round(3*geoMean(endo_counts), 3)
+        
+        ## add values to table
+        geo_means[geo_means$ID==sampID,"endo_geo_mean"] <- round(geoMean(endo_counts), 3) # geometric mean of endogenous genes
+        geo_means[geo_means$ID==sampID,"hk_geo_mean"] <- round(geoMean(hk_counts), 3) # geometric mean of HK genes
+        geo_means[geo_means$ID==sampID,"pos_geo_mean"] <- round(geoMean(pos_counts), 3) # geometric mean of positive controls
+        geo_means[geo_means$ID==sampID,"neg_geo_mean"] <- round(geoMean(neg_counts), 3) # geometric mean of negative controls
     }
     
     if (any(geo_means$pos_mean < geo_means$sd3)) {
@@ -280,19 +284,20 @@ qcCounts <- function(count_table) {
     })
     
     if (any(positiveLinearityQC < 0.95)) {
-        cat(">>Linearity performance is low (<0.95) for:\n",
+        cat(">>Linearity performance is low (<0.95) for the following sample(s):\n",
             names(which(positiveLinearityQC < 0.95)))
     } else {
         cat("\n>>Positive control linearity [lm(counts ~ concentration)] is > 0.95 for all samples\n")
     }
     
-    ## save positive control linearity table
-    PL_table <- data.frame(PL=positiveLinearityQC)
-    PL_table$ID <- rownames(PL_table)
+    ## add positive control linearity to geo means table
+    pcl_tab <- data.frame(PCL=positiveLinearityQC)
+    pcl_tab$ID <- rownames(pcl_tab)
     
+    ## plot positive control counts v. concentration
     tab <- pos_tab
-    #tab$Name <- NULL
-    ## supress annoying data table warning message
+    
+    ## supress data table warning message
     suppressWarnings({
     tab <- data.table::melt(tab, measure.vars=samp_ids, verbose=FALSE)
     colnames(tab) <- c("Name", "concentration", "ID", "count")
@@ -305,7 +310,7 @@ qcCounts <- function(count_table) {
         geom_smooth(aes(fill=ID), method = "lm", fullrange=TRUE, se=TRUE, size=1, 
                     color="slategray", formula = y ~ x, linetype="dashed")
     
-    cat('----------------------------------\n',
+    cat('\n----------------------------------\n',
         'Positive Control Limit of Detection:\n',
         '(POS_E control probe counts > mean negative control + 2*SD)\n')
     
@@ -319,31 +324,79 @@ qcCounts <- function(count_table) {
     
     ## POS_E counts should be > lod
     if (any(pos_e_counts < lod)) {
-        cat(">>Postive control limit of detection is low for the following samples:\n",
+        cat(">>Postive control limit of detection is low for the following sample(s):\n",
             names(pos_e_counts[which(pos_e_counts < lod)]), '\n')
     } else {
         cat(">>Positive control E counts are > LoD for all samples\n")
     }
     
-    ## % endogenous genes above LoD per sample
-    pctLOD <- data.frame(ID=samp_ids, stringsAsFactors=FALSE)
-    pctLOD$pctLOD <- rep(NA, nrow(pctLOD))
+    ## % endogenous (n=758) and housekeeping (n=12) genes above LoD per sample
+    pctLOD <- data.frame(ID=names(lod), LOD=lod)
+    pctLOD$pct_endo_alod <- rep(NA, nrow(pctLOD)) #percent endo genes above LoD
+    pctLOD$pct_hk_alod <- rep(NA, nrow(pctLOD)) #percent HK genes above LoD
+    pctLOD$num_hk_alod <- rep(NA, nrow(pctLOD)) #tot HK genes above LoD
     
     for (i in 1:length(samp_ids)) {
-        i_counts <- endo_tab[,samp_ids][i]
-        i_lod <- lod[i]
-        pctLOD[i,"pctLOD"] <- round(length(i_counts[which(i_counts[,1] > i_lod),]) / nrow(i_counts) * 100, 3)
+    	
+    	idx <- samp_ids[i]
+    	i_lod <- pctLOD[idx,"LOD"]
+    	
+    	# percent endogenous genes > LoD
+        endo_counts <- endo_tab[,idx]
+        pctLOD[idx,"pct_endo_alod"] <- round(length(endo_counts[which(endo_counts > i_lod)]) / length(endo_counts) * 100, 3)
+        
+        # percent housekeeping genes > LoD
+        hk_counts <- hk_tab[,idx]
+        pctLOD[idx,"num_hk_alod"] <- round(length(hk_counts[which(hk_counts > i_lod)]), 3)
+        pctLOD[idx,"pct_hk_alod"] <- round(pctLOD[idx,"num_hk_alod"] / length(hk_counts) * 100, 3)
+        
     }
     
-    pctLOD <- data.frame(pctLOD, stringsAsFactors=FALSE)
-    
+    ## combine stats
     out_tab <- merge(geo_means, pctLOD, by="ID")
-    out_tab <- merge(out_tab, PL_table, by="ID")
+    out_tab <- merge(out_tab, pcl_tab, by="ID")
     
+    cat('----------------------------------\n',
+        'Limit of Detection Flag:\n',
+        '(Sample(s) with >1 housekeeping gene below the LOD and high % of endogenous genes < LOD (lod_flag))\n');
+    
+    ## flag samples with >1 HK gene below LoD AND %endo_genes<LOD greater than the top quartile of the distribution of %endo_genes<LoD in samples with all HK genes above LoD
+    ref_blod <- quantile(100 - out_tab[out_tab$num_hk_alod==12,"pct_endo_alod"], 0.75) #samps w/ all HK genes > LoD
+    out_tab$pct_endo_blod <- 100 - out_tab$pct_endo_alod # %endogenous genes < LoD for non-ref samples
+    out_tab$lod_flag <- ifelse(out_tab$pct_endo_blod > ref_blod & out_tab$num_hk_alod<11, 1, 0)
+    
+    if (any(out_tab$lod_flag==1)) {
+    	cat(">>Sample(s) with LOD flag:\n",
+    	    out_tab[out_tab$lod_flag==1,"ID"], '\n')
+    } else {
+    	cat(">>No samples flagged for LOD QC\n")
+    }
     cat('----------------------------------\n');
-    #print(kable(pctLOD[pctLOD$pctLOD < 80,], caption=">>Sample(s) with <80% endogenous genes above the Limit of Detection:"), 
-    #      warnings=FALSE, row.names=FALSE)
     
+    cat('----------------------------------\n',
+        'RNA content Flag:\n',
+        '(HK gene raw counts v. the n [n=length(HKgenes)] most highly expressed endogenous genes per sample)\n');
+    out_tab$rna_content_r2 <- NA
+    for (i in 1:nrow(out_tab)) {
+    	i_id <- out_tab[i,"ID"]
+    	i_endo <- count_table[count_table$CodeClass=="Endogenous",i_id]
+    	i_hk <- count_table[count_table$CodeClass=="Housekeeping",i_id]
+    	raw_counts <- data.frame(endo=i_endo[order(i_endo, decreasing=TRUE)][1:length(i_hk)], hk=i_hk[order(i_hk, decreasing=TRUE)])
+    	corr = round(summary(lm(raw_counts$endo ~ raw_counts$hk))$r.squared, 3)
+    	out_tab[i,"rna_content_r2"] <- corr
+    }
+    rna_threshold = mean(out_tab$rna_content_r2) - 3*sd(out_tab$rna_content_r2)
+    if (any(out_tab$rna_content_r2 < rna_threshold)) {
+    	cat(">>Sample(s) with RNA content flag:\n",
+    	    out_tab[out_tab$rna_content_r2 < rna_threshold,"ID"], '\n')
+    	out_tab$rna_content_flag <- ifelse(out_tab$rna_content_r2 < rna_threshold, 1, 0)
+    } else {
+    	cat(">>No samples flagged for RNA content\n")
+    }
+    cat('----------------------------------\n');
+    
+    #out_tab$pcl_flag <- ifelse(out_tab$PCL < 0.95, 1, 0)
+
     return(list(qc_table=out_tab,
                 pos_control_counts=pos_tab,
                 linearity_plot=linearity_plot))
@@ -351,7 +404,8 @@ qcCounts <- function(count_table) {
 }
 
 ##------------------------------
-## QC table and plot functions
+## TODO:combine with qcCounts > sampleQC
+## QC table and plot functions:
 sampleStats <- function(tab) {
     
     ## endogenous gene stats
@@ -381,20 +435,47 @@ sampleStats <- function(tab) {
 
 ##------------------
 ## Housekeeping gene QC and selection
-## candidate housekeeping genes have a high mean and very low variance
 ## gene_annotations includes "CodeClass", "Name", "Accession"
 ## group_labels is optional
 hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
     
-    #hk_counts <- raw_counts[raw_counts$CodeClass=="Housekeeping",c("Name", samp_ids)]
     hk_genes <- gene_annotations[gene_annotations$CodeClass=="Housekeeping","Name"]
     hk_counts <- as.matrix(raw_counts[,colnames(raw_counts) %in% hk_genes])
     
-    ## TODO: exlcude HK genes below limit of detection
+    nc_genes <- gene_annotations[gene_annotations$CodeClass=="Negative","Name"]
+    ncg_counts <- as.matrix(raw_counts[,colnames(raw_counts) %in% nc_genes])
     
-    ## caclulate CV for each HK gene
-    #hk_cv = apply(hk_counts, 1, sd, na.rm=TRUE) / apply(hk_counts, 1, mean, na.rm=TRUE) * 100
+    #endo_genes <- gene_annotations[gene_annotations$CodeClass=="Endogenous","Name"]
+    #endo_counts <- as.matrix(raw_counts[,colnames(raw_counts) %in% endo_genes])
     
+    ## HK genes below limit of detection > return percent of samples in which HK genes is < LOD
+    ncgMean = apply(ncg_counts, 1, mean)
+    ncgSD = apply(ncg_counts, 1, sd)
+    lod = ncgMean + 2*ncgSD
+    #lod = ncgMean
+    lod_df <- data.frame(ID=names(lod), lod=lod)
+    
+    hk_tab <- data.frame(hk_counts)
+    hk_tab$ID <- rownames(hk_tab)
+    hk_tab <- merge(lod_df, hk_tab, by="ID")
+    rownames(hk_tab) <- hk_tab$ID
+    hk_tab$ID <- NULL
+    
+    hk_blod<-NULL
+    for (i in 1:nrow(hk_tab)) {
+    	df<-data.frame(hk_tab[i,-1] < hk_tab[i,"lod"])
+    	hk_blod <- append(hk_blod, colnames(df)[df[1,]==TRUE])
+    }
+    hk_blod_df <- data.frame(table(hk_blod))
+    hk_blod_df <- hk_blod_df[order(hk_blod_df$Freq, decreasing=TRUE),]
+    hk_blod_df$pct <- round(hk_blod_df$Freq / nrow(hk_tab) * 100, 3)
+    
+    ## 00: calculate CV for each HK gene
+    hk_gene_stats <- data.frame(gene=colnames(hk_counts))
+    hk_gene_stats$mean = apply(hk_counts, 2, mean, na.rm=TRUE)
+    hk_gene_stats$cv = apply(hk_counts, 2, sd, na.rm=TRUE) / apply(hk_counts, 2, mean, na.rm=TRUE)
+    hk_gene_stats <- hk_gene_stats[order(hk_gene_stats$cv, decreasing=F),]
+
     ## 01: geNorm method, Vandesompele et al. 2002
     ## rank of genes from most to least stable (2 most stable cannot be ranked)
     ## calculate average pairwise variation (sd of the log transformed expression ratios) with all other genes to determine
@@ -403,15 +484,21 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
     
     hk_gn <- NormqPCR::selectHKs(hk_counts, method = "geNorm", Symbols=colnames(hk_counts), na.rm=TRUE, minNrHK=2, log=FALSE)
     
+    ## rank=1 indicates most stable
     hk_rank <- data.frame(rank=names(hk_gn$rank), gene=hk_gn$rank, stringsAsFactors=FALSE)
     
     hk_m <- data.frame(n_genes=names(hk_gn$meanM), meanM=hk_gn$meanM, stringsAsFactors=FALSE) #stability values
     hk_m <- hk_m[order(hk_m$meanM, decreasing=TRUE),]
     hk_m$n_genes <- factor(hk_m$n_genes, levels=hk_m$n_genes)
     
+    hk_m <- merge(hk_m, hk_rank, by.x="n_genes", by.y="rank", all=T)
+    hk_m[hk_m$n_genes==2,"gene"]<-paste(hk_m[hk_m$n_genes=="1", "gene"], collapse="|")
+    hk_m <- hk_m[hk_m$n_genes!="1",]
+    
     ## rank least to most stable
     gp_hk <- ggplot(data=hk_m, aes(x=n_genes, y=meanM)) + geom_point(col="dodgerblue", size=4, pch=19) + 
         ggtitle("Mean HK gene stability") +  xlab("# HK genes") +
+    	geom_text_repel(data=hk_m, aes(x=n_genes, y=meanM, label=gene), colour="gray", size=4) +
         theme(panel.grid.major=element_blank(), panel.grid.minor=element_line(color="gray"),
               panel.background=element_blank(), axis.line=element_line(color="white"),
               legend.title=element_blank(),
@@ -423,41 +510,43 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
     
     ## select HK genes to be used in normalization
     ## manually or automatically (M<0.7)
-    num_hk_genes=as.numeric(as.character(hk_m[hk_m$meanM<0.7,][1,"n_genes"]))
+    #num_hk_genes=as.numeric(as.character(hk_m[hk_m$meanM<0.7,][1,"n_genes"]))
+    #hk_genes_keep <- hk_rank[1:num_hk_genes,"gene"]
+    #hk_genes_remove <- colnames(hk_counts)[!colnames(hk_counts) %in% hk_genes_keep]
     
-    hk_genes_keep <- hk_rank[1:num_hk_genes,"gene"]
-    hk_genes_remove <- colnames(hk_counts)[!colnames(hk_counts) %in% hk_genes_keep]
-    
-    ## 02: NormFinder method, Andersen et al. 2004; use if groups available
-    #hk_nf <- NormqPCR::selectHKs(hk_counts, method = "NormFinder", group=group_labels, Symbols=colnames(hk_counts), minNrHK = 2, log = FALSE)
-    ## ideally: start with 3 control genes > stepwise inclusion of more control genes until the (n + 1)th gene has 
-    ## no significant contribution to the newly calculated normalization factor
-    
-    ## output stability plot, regression pvals, hk genes to exclude (if any)
-    ## if available, NB regression between hk_genes ~ biological conditions/outcomes of interest
+    ## 02: use group labels for comparison
     if (length(group_labels)>0) { 
         
-        hk_pvals = data.frame(gene=colnames(hk_counts), pval=rep(NA, ncol(hk_counts)))
+    	## 02: NB regression between hk_genes ~ biological conditions/outcomes of interest
+    	nb_pvals = data.frame(gene=colnames(hk_counts), pval=rep(NA, ncol(hk_counts)))
         
         for (i in 1:ncol(hk_counts)){
             hk_nb <- MASS::glm.nb(as.numeric(hk_counts[,i]) ~ as.factor(group_labels))
-            hk_pvals$'pval'[i] = coef(summary(hk_nb))[2,4]
-            hk_pvals <- hk_pvals[order(hk_pvals$pval, decreasing=FALSE),]
-            hk_pvals$padj <- p.adjust(hk_pvals$pval, method="bonferroni")
+            nb_pvals$'pval'[i] = coef(summary(hk_nb))[2,4]
+            nb_pvals <- nb_pvals[order(nb_pvals$pval, decreasing=FALSE),]
+            nb_pvals$padj <- p.adjust(nb_pvals$pval, method="bonferroni")
         }
         
         ## exclude genes with padj<0.05
-        hk_genes_remove <- append(hk_genes_remove, hk_pvals[hk_pvals$padj<0.05,"gene"])
-        hk_list <- list(hk_plot=gp_hk, nb_pvals=hk_pvals, exclude=hk_genes_remove)
+        #hk_genes_remove <- append(hk_genes_remove, nb_pvals[nb_pvals$padj<0.05,"gene"])
+        hk_list <- list(hk_lod_stats=hk_blod_df, mval_plot=gp_hk, hk_mvals=hk_m, hk_gene_stats=hk_gene_stats, nb_pvals=nb_pvals)
+        
+        ## 03: NormFinder method, Andersen et al. 2004; use if groups available
+        ## stepwise inclusion of more control genes until the (n + 1)th gene 
+        ## has no significant contribution to the newly calculated normalization factor
+        #hk_counts_t <- t(hk_counts)
+        #hk_nf <- NormqPCR::selectHKs(hk_counts_t, method = "NormFinder", Symbols=rownames(hk_counts_t), group=as.factor(group_labels), minNrHK = 2, log = FALSE)
+        
     } else {
-        hk_list <- list(hk_plot=gp_hk, exclude=hk_genes_remove)
+        hk_list <- list(hk_lod_stats=hk_blod_df, mval_plot=gp_hk, hk_mvals=hk_m, hk_gene_stats=hk_gene_stats)
     }
     
-    if (length(hk_genes_remove)<1) {
-        cat("No housekeeping genes to exclude based on stability")
-    }
+    # if (length(hk_genes_remove)<1) {
+    #     cat("No housekeeping genes to exclude based on stability")
+    # }
+    
     return(hk_list[lengths(hk_list) != 0])
-    
+           
 }
 
 ##------------------
@@ -563,11 +652,15 @@ NSnorm <- function(eset, background_correction=FALSE, take_log=TRUE) {
 }
 
 ## OPTION 2: RUV
-RUVnorm <- function(eset, k, method="RUVg") {
+## default uses housekeeping genes as negative controls
+RUVnorm <- function(eset, k, method="RUVg", control_genes=NULL) {
     
     cat("k=", k, '\n');
     ## upper quantile normalization (Bullard 2010)
     eset <- betweenLaneNormalization(eset, which="upper")
+    fdat <- fData(eset)
+    endo_genes <- fdat[fdat$CodeClass=="Endogenous","Name"]
+    hk_genes <- fdat[fdat$CodeClass=="Housekeeping","Name"]
     
     if ( isFALSE(all(colnames(fData(eset)) == c("CodeClass", "Name", "Accession"))) ) {
         stop("Feature data column names must be c('CodeClass', 'Name', 'Accession')")
@@ -575,17 +668,29 @@ RUVnorm <- function(eset, k, method="RUVg") {
     
     ##------------------------------
     ## negative control genes = genes assumed not to be DE with respect to the covariate of interest
-    c_idx <- rownames(eset)[fData(eset)$CodeClass == "Housekeeping"]
+    if (!is.null(control_genes)){
+    	cat("using custom genes as negative controls\n")
+    	c_idx <- rownames(eset)[rownames(eset) %in% control_genes]
+    } else {
+    	cat("using housekeeping genes as negative controls\n")
+    	control_genes <- hk_genes
+    	c_idx <- rownames(eset)[rownames(eset) %in% control_genes]	
+    }
+
+    ## exclude non-endogenous and non-control genes
+    counts_filt <- counts(eset)[rownames(eset) %in% c(endo_genes, control_genes),]
+    fdat_filt <- AnnotatedDataFrame(data=fdat[fdat$Name %in% c(endo_genes, control_genes),])
+    eset_filt <- newSeqExpressionSet(counts_filt, phenoData=pData(eset), featureData=fdat_filt)
     
     if(method=="RUVg") {
         ## RUVg using negative control genes (ie. genes assumed not to be DE with respect to the covariate of interest)
         cat("applying RUVg normalization\n")
-        eset <- RUVg(eset, c_idx, k=k, isLog=FALSE, round=TRUE)
+    	eset_filt <- RUVg(eset_filt, c_idx, k=k, isLog=FALSE, round=TRUE)
     } else if(method=="RUVs") {
         ## RUVs: negative control samples for which covariates of interest are constant (eg. centered counts for technical replicates)
         #cat("applying RUVs normalization\n")
         #eset <- RUVs(eset, c_idx, k=k, isLog=FALSE, round=TRUE)
-        cat("RUVr is not yet implemented")
+        cat("RUVs is not yet implemented")
     } else if(method=="RUVr") {
         ## RUVr: uses residuals from a first pass GLM regression of the unnormalized counts on covariates of interest
         #my.glm <- glm(assay(eset) ~ as.factor(group_labels)))
@@ -597,8 +702,9 @@ RUVnorm <- function(eset, k, method="RUVg") {
     }
     
     ##------------------------------
-    
-    dds <- DESeqDataSetFromMatrix(counts(eset), colData=pData(eset), design=~1)
+    ## output endogenous genes only
+    endo_counts <- counts(eset_filt)[rownames(eset_filt) %in% endo_genes,]
+    dds <- DESeqDataSetFromMatrix(endo_counts, colData=pData(eset_filt), design=~1)
     #rowData(dds) <- fData(eset)
     
     ## estimate size factors
@@ -620,7 +726,7 @@ RUVnorm <- function(eset, k, method="RUVg") {
     assay(vsd) <- mat
     
     ## return expression set with unwanted variation added and log, normalized counts
-    return(list(eset = eset, 
+    return(list(eset = eset_filt, 
                 vsd = vsd))
 }
 
@@ -650,30 +756,46 @@ RCRnorm <- function(counts) {
 
 ##------------------
 ## Relative log expression plot (log2(expression/median across all assays))
-plotRLE <- function(counts, is_logged=TRUE, main=NULL) {
+plotRLE <- function(x_endo, is_logged=TRUE, main=NULL, xlab=TRUE) {
     
-    x_endo <- counts[rownames(counts) %in% ns.counts[ns.counts$CodeClass=="Endogenous","Name"],]
+	if (!class(x_endo)[1]=="matrix") {
+		x_endo <- as.matrix(x_endo)
+	}
+	
+	#x_endo <- counts[rownames(counts) %in% ns.counts[ns.counts$CodeClass=="Endogenous","Name"],]
     
-    endo_median <- apply(x_endo, 1, median) #per gene median
+	endo_median <- apply(x_endo, 1, median) #per gene median
     
-    if (is_logged == TRUE) {
-        endo_rle = x_endo - endo_median
-    } else {
-        endo_rle <- log2(x_endo/endo_median)
-    }
+	if (is_logged == TRUE) {
+        	endo_rle = x_endo - endo_median
+	} else {
+        	endo_rle <- log2(x_endo/endo_median)
+	}
     
-    suppressWarnings({
-        endo_melt <- data.table::melt(endo_rle, measure.vars=c(1:dim(endo_rle)[2]))
-    })
-    endo_melt <- na.omit(endo_melt)
+	suppressWarnings({
+        	endo_melt <- data.table::melt(endo_rle, measure.vars=c(1:dim(endo_rle)[2]))
+	})
+	endo_melt <- na.omit(endo_melt)
     
-    ggplot(endo_melt, aes(x=reorder(Var2, value, median, order=TRUE), y=value, fill=Var2)) + 
-        ggtitle(main) + ylab("log2(counts/median)") +
-        geom_hline(yintercept=0, linetype="dashed", color="firebrick") +
-        geom_boxplot(outlier.size=1, outlier.shape=21, outlier.fill="whitesmoke") +
-        theme(legend.position="none",
-              axis.text.x=element_text(size=6, angle=90),
-              axis.title.x=element_blank())
+	if(xlab=="TRUE") {
+    		gp <- ggplot(endo_melt, aes(x=reorder(Var2, value, median, order=TRUE), y=value, fill=Var2)) + 
+    			ggtitle(main) + ylab("log2(counts/median)") +
+    			geom_hline(yintercept=0, linetype="dashed", color="firebrick") +
+    			geom_boxplot(outlier.size=1, outlier.shape=21, outlier.fill="whitesmoke") +
+    			theme(legend.position="none",
+    			axis.text.x=element_text(size=6, angle=90),
+    			axis.title.x=element_blank())
+	} else {
+    		gp <- ggplot(endo_melt, aes(x=reorder(Var2, value, median, order=TRUE), y=value, fill=Var2)) + 
+    			ggtitle(main) + ylab("log2(counts/median)") +
+    			geom_hline(yintercept=0, linetype="dashed", color="firebrick") +
+    			geom_boxplot(outlier.size=1, outlier.shape=21, outlier.fill="whitesmoke") +
+    			theme(legend.position="none",
+    			axis.text.x=element_blank(),
+    			axis.title.x=element_blank())	
+	}
+
+	return(gp)
 }
 
 ##--------------------------------------------------------------------------------
@@ -729,7 +851,7 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
 }
 
 ##------------------
-## output sequencing run QC
+## QC a single RCC file
 rccQC <- function(RCCfile, outPath) {
     
     if (rlang::is_empty(outPath)) {
@@ -804,11 +926,11 @@ rccQC <- function(RCCfile, outPath) {
     attTable$'PCL' <- pcl
     
     plot_pos_linearity <- ggplot(pos, aes(x=Conc, y=Count)) + ggtitle(paste(expression(R^2), " = ", pcl)) +
-        geom_point(shape = 21, colour="darkblue", size=3, fill = "dodgerblue") +
-        xlab("concentration") + ylab("raw counts") +
-        geom_text_repel(data=pos, aes(x=Conc, y=Count, label=Name), size=4, colour="darkgray") +
-        geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, size=1, 
-                    color="slategray", formula = y ~ x, linetype="dashed")
+        	geom_point(shape = 21, colour="darkblue", size=3, fill = "dodgerblue") +
+        	xlab("concentration") + ylab("raw counts") +
+        	geom_text_repel(data=pos, aes(x=Conc, y=Count, label=Name), size=4, colour="darkgray") +
+        	geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, size=1, 
+                	color="slategray", formula = y ~ x, linetype="dashed")
     ggsave(paste0(outPath, sampID, "/pcl_plot_", sampID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
     
     outTable <- attTable[!colnames(attTable) %in% c("Owner", "Comments", "SystemAPF", "laneID", "ScannerID", "StagePosition", "CartridgeBarcode", "CartridgeID")]
@@ -825,9 +947,8 @@ rccQC <- function(RCCfile, outPath) {
     outTable[vars_to_round] <- format(round(outTable[vars_to_round], 2), nsmall = 2)
     outTable <- data.frame(t(outTable))
     
-    write.table(outTable,
-                file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"),
-                quote=FALSE, sep='\t', row.names=TRUE)
+    #write.table(outTable, quote=FALSE, sep='\t', row.names=TRUE,
+    #           file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"))
     
     ##-------------------------------------------
     ## output files and plots for markdown report

@@ -58,7 +58,7 @@ dx_no_rejection <- unique(mscores_ref$Dx)[!unique(mscores_ref$Dx) %in% c(dx_amr,
 ##-----------------------------------------------------
 ## import BHOT gene annotations
 ##-----------------------------------------------------
-bhot_annot <- read.csv('../static/BHOT_annotations_il6.csv', check.names=FALSE, header=TRUE)
+bhot_annot <- read.csv('../static/BHOT_annotations_v1.csv', check.names=FALSE, header=TRUE)
 ## exclude control and viral genes (n=12+4)
 rm_genes <- bhot_annot[bhot_annot$`Internal Reference Gene`=="+" | bhot_annot$`Viral Detection`=="+","Gene"]
 bhot_annot <- bhot_annot[!bhot_annot$Gene %in% rm_genes,]
@@ -68,9 +68,11 @@ endats <- endats[endats$V1 %in% bhot_annot$Gene,]
 
 bhot_cell_types <- c("B-cells", "Macrophages", "T-cells", "NK cells")
 
-bhot_pathways <- c("B-cell Receptor Signaling", "Chemokine Signaling", "Complement System", "IL6 Signaling", "MAPK", "mTOR", "NF-kappaB Signaling",
-                   "Th1 Differentiation", "Th17 Differentiation", "Th2 Differentiation", "TNF Family Signaling", "Treg Differentiation",
-                   "Type I Interferon Signaling", "Type II Interferon Signaling")
+#  "MAPK", "TNF Family Signaling", added to "Type I Interferon Signaling"
+bhot_pathways <- c("B-cell Receptor Signaling", "Chemokine Signaling", "Complement System", "mTOR", "NF-kappaB Signaling",
+                   "Th1 Differentiation", "Th17 Differentiation", "Th2 Differentiation", "Treg Differentiation",
+                   "Type I Interferon Signaling", "Type II Interferon Signaling", "IL6 Signaling",
+		   "Cytotoxicity", "T-cell Receptor Signaling", "Toll-like Receptor Signaling") #important for TCMR (NK et CD8-granzyme activation, T cell activation, allorecognition/innate immunity)
 
 bhot_annot <- bhot_annot[,colnames(bhot_annot) %in% c("Gene", "Cell Type", bhot_pathways)]
 
@@ -165,7 +167,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     samp_ind <- grep(newID, colnames(countTable))
     if (length(samp_ind) > 1) {
     	colnames(countTable)[samp_ind][1]<-newID
-    	colnames(countTable)[samp_ind][2]<-paste(newID, "-new")
+    	colnames(countTable)[samp_ind][2]<-paste0(newID, "-new")
+    	newID<-paste0(newID, "-new")
     }
 
     ## TODO: ruvseq
