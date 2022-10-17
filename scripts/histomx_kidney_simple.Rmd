@@ -47,7 +47,7 @@ knitr::opts_chunk$set(echo = TRUE)
 > **Team leader:** Pr Alexandre Loupy MD/PhD  
 **Project managers:** Fariza Mezine & Blaise Robin  
 **Bioinformatician:** Dina Zielinski PhD
-**Clinical reviewer:** Valentin Goutaudier MD  
+**Clinical reviewer:** Olivier Aubert MD/PhD     
 **Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85  
 > Inserm U970 - 56 rue Leblanc 75015 Paris, France
 
