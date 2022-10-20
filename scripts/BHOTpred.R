@@ -1,35 +1,40 @@
 
+#setwd('~/Desktop/histomx-v1.9/bin/')
+
 ## predict probability of rejection on new biopsy
 source('../scripts/BHOT.R')
 
 ##-----------------------------------------------------
 ## load models
 ##-----------------------------------------------------
-modelPath='../model_data/BHOT/models/'
+modelPath='../model_data/kidney/models/'
 
+##----------
+## archetypes model
 aa_model <- get(load(paste0(modelPath, 'aa_model.rda')))
 
-## diagnosis
-multi.model <- get(load(paste0(modelPath, 'multi_dx_model.RData')))
-normal.model <- get(load(paste0(modelPath, 'normal_model.RData')))
-amr.model <- get(load(paste0(modelPath, 'amr_model.RData')))
-tcmr.model <- get(load(paste0(modelPath, 'tcmr_model.RData')))
-atcmr.model <- get(load(paste0(modelPath, 'atcmr_model.RData')))
-catcmr.model <- get(load(paste0(modelPath, 'catcmr_model.RData')))
-ifta.model <- get(load(paste0(modelPath, 'ifta_model.RData')))
+##----------
+## diagnosis base models
 
+glm.model <- get(load(paste0(modelPath, 'dx_model_glm.rda')))
+c5.model <- get(load(paste0(modelPath, 'dx_model_c5.rda')))
+gbm.model <- get(load(paste0(modelPath, 'dx_model_gbm.rda')))
+knn.model <- get(load(paste0(modelPath, 'dx_model_knn.rda')))
+lda.model <- get(load(paste0(modelPath, 'dx_model_lda.rda')))
+rf.model <- get(load(paste0(modelPath, 'dx_model_rf.rda')))
+svm.model <- get(load(paste0(modelPath, 'dx_model_svm.rda')))
+xgb.model <- get(load(paste0(modelPath, 'dx_model_xgb.rda')))
+
+##----------
 ## banff lesions
+
 ## ordinal
 g_score.model <- get(load(paste0(modelPath, 'g_ordinal_model.RData')))
 ptc_score.model <- get(load(paste0(modelPath, 'ptc_ordinal_model.RData')))
 i_score.model <- get(load(paste0(modelPath, 'i_ordinal_model.RData')))
 t_score.model <- get(load(paste0(modelPath, 't_ordinal_model.RData')))
-## binary
-g0_score.model <- get(load(paste0(modelPath, 'g0_score_model.RData')))
-ptc0_score.model <- get(load(paste0(modelPath, 'ptc0_score_model.RData')))
-i1_score.model <- get(load(paste0(modelPath, 'i1_score_model.RData')))
-t1_score.model <- get(load(paste0(modelPath, 't1_score_model.RData')))
 
+## binary
 cg0_score.model <- get(load(paste0(modelPath, 'cg0_score_model.RData')))
 v0_score.model <- get(load(paste0(modelPath, 'v0_score_model.RData')))
 iifta0_score.model <- get(load(paste0(modelPath, 'iifta0_score_model.RData')))
@@ -37,30 +42,29 @@ ci1_score.model <- get(load(paste0(modelPath, 'ci1_score_model.RData')))
 ct1_score.model <- get(load(paste0(modelPath, 'ct1_score_model.RData')))
 cv1_score.model <- get(load(paste0(modelPath, 'cv1_score_model.RData')))
 
-## import refSet molecular scores and Dx
-mscores_all_file <- '../model_data/BHOT/tables/refset_molecular_scores_all.txt'
-mscores_aa_file <- '../model_data/BHOT/tables/refset_molecular_scores_aa.txt'
+##----------
+## import refSet Dx molecular scores + Dx + archetype cluster
+dx_ref <- read.table('../model_data/kidney/tables/refset_molecular_scores_dx_aa.txt', header=TRUE, sep='\t')
+rownames(dx_ref) <- dx_ref$ID
 
-mscores_ref <- read.table(mscores_all_file, header=TRUE, sep='\t')
-rownames(mscores_ref) <- mscores_ref$ID
+## import refSet lesion molecular scores + Banff scores
+banff_ref <- read.table('../model_data/kidney/tables/refset_molecular_scores_banff.txt', header=TRUE, sep='\t', stringsAsFactors=FALSE)
 
-## import Banff scores
-banff_ref <- read.table('../model_data/BHOT/tables/refset_banff_scores_all.txt', header=TRUE, sep='\t', stringsAsFactors=FALSE)
+## import experimental design
+exp_design <- read.table('../model_data/kidney/tables/exp_design.txt', header=TRUE, sep='\t')
 
 ## Define histology diagnosis categories
-dx_normal <- c("Normal or minimal changes", "Pristine", "No specific diagnosis")
-dx_amr <- c("Active AMR", "Chronic (+/- active) AMR")
+dx_amr <- c("Active AMR", "Chronic active AMR", "Chronic inactive AMR")
 dx_tcmr <- c("Acute TCMR", "Chronic active TCMR")
-dx_ati <- c("Acute tubular injury")
-dx_ifta <- c("Isolated IFTA") #ie. IFTA w/ no rejection
-dx_no_rejection <- unique(mscores_ref$Dx)[!unique(mscores_ref$Dx) %in% c(dx_amr, dx_tcmr)]
+dx_normal <- c("Normal or minimal changes", "Pristine")
+dx_no_rejection <- unique(dx_ref$Dx)[!unique(dx_ref$Dx) %in% c(dx_amr, dx_tcmr)]
 
 ##-----------------------------------------------------
 ## import BHOT gene annotations
 ##-----------------------------------------------------
 bhot_annot <- read.csv('../static/BHOT_annotations_v1.csv', check.names=FALSE, header=TRUE)
-## exclude control and viral genes (n=12+4)
-rm_genes <- bhot_annot[bhot_annot$`Internal Reference Gene`=="+" | bhot_annot$`Viral Detection`=="+","Gene"]
+## exclude control genes (n=12)
+rm_genes <- bhot_annot[bhot_annot$`Internal Reference Gene`=="+","Gene"]
 bhot_annot <- bhot_annot[!bhot_annot$Gene %in% rm_genes,]
 
 endats <- read.table('../static/ENDAT_genes.txt', check.names=FALSE, header=FALSE)
@@ -91,11 +95,7 @@ bhot_cell_type_totals <- rbind(bhot_cell_type_totals,
 refRCCpath="../refRCCs/"
 refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE)
 
-## manually exclude pediatric biospy RCCs for now
-pedRCC <- read.table('../static/ped_rcc_ids.txt', header=FALSE)
-refRCC <- refRCC[!basename(refRCC) %in% pedRCC[,1]]
-
-#newRCC='../test_files/test.RCC'
+#newRCC='../test_files/amr.RCC'
 #outPath='~/Downloads/'
 #preds<-BHOTpred(newRCC, outPath)
 
@@ -129,7 +129,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## get new sample ID
     new.ns.data <- parseRCC(newRCC)
     newID <- colnames(new.ns.data$attributes)[2]
-
+    
     ## verify BHOT sequencing panel
     newRLF <- new.ns.data$attributes[new.ns.data$attributes$variable=="GeneRLF",newID]
 
@@ -150,20 +150,15 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #ns.data <- parseRCC(RCCfiles)
     #countTable <- ns.data$counts
     #rownames(countTable) <- countTable$Name
-    ## keep only samples used in classifiers: eventually exclude unused RCC files from final repo
-    #countTable <- countTable[,colnames(countTable) %in% c("CodeClass", "Name", "Accession", rownames(mscores_ref), newID)]
-    
     ##------------------
-    ## output raw counts for all reference samples used in classifiers
-    #write.table(countTable, file='../tables/refset_raw_counts.txt', quote=F, row.names=F, sep='\t')
 
     ## load raw count table, parse newRCC, and merge counts
-    ns.data <- read.table('../model_data/BHOT/tables/refset_raw_counts.txt', sep='\t', header=TRUE, check.names=FALSE)
+    ns.data <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
     ns.new <- parseRCC(newRCC)
-    countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"))
+    countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
     rownames(countTable) <- countTable$Name
 
-    ## rename newID if also exists in refset sample names: rownames(mscores_ref)
+    ## rename newID if exists in refset sample names: rownames(dx_ref)
     samp_ind <- grep(newID, colnames(countTable))
     if (length(samp_ind) > 1) {
     	colnames(countTable)[samp_ind][1]<-newID
@@ -171,56 +166,59 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     	newID<-paste0(newID, "-new")
     }
 
-    ## TODO: ruvseq
     ##------------------------
-    ## Normalization: no background correction
-    x <- countTable[,!colnames(countTable) %in% c("CodeClass", "Name", "Accession")]
-
-    ## 01 arithmetic mean of the geometric means of positive controls
-    posTab <- t(x[rownames(x) %in% countTable[countTable$CodeClass=="Positive","Name"],])
-    pos.sample <- apply(posTab, MARGIN=1, FUN=geoMean);
-    pos.norm.factors <- data.frame(ID=names(pos.sample), mean=mean(pos.sample) / pos.sample)
-    pos.norm.factors$mean <- round(pos.norm.factors$mean, 2)
-    rownames(pos.norm.factors) <- NULL
-
+    ## Normalize refset with new sample
+    
+    ## expression matrix
+    ns.counts <- as.matrix(countTable[,-c(1:3)])
+    
+    ## feature data
+    ns.anno <- countTable[,c(1:3)]
+    rownames(ns.anno) <- ns.anno$Name
+    
+    ## phenotype data
+    pdat <- data.frame(ID=colnames(ns.counts), check.names=FALSE)
+    pdat <- merge(pdat, exp_design, by="ID", all.x=TRUE, sort=FALSE)
+    rownames(pdat) <- pdat$ID
+    
+    ## eset
+    pdat <- AnnotatedDataFrame(data=pdat,)
+    fdat <- AnnotatedDataFrame(data=ns.anno)
+    eset <- newSeqExpressionSet(ns.counts, phenoData=pdat, featureData=fdat)
+    
+    cat(">>Normalizing raw count data", "\n")
+    
+    ## RUV normalization
+    ruv_norm <- RUVnorm(eset, k=2, method="RUVg")
+    ns.norm <- assay(ruv_norm$vsd) ## normalized endogenous counts
+    #ns.raw <- counts(ruv_norm$eset)[rownames(counts(ruv_norm$eset)) %in% endo_genes,]
+    
+    ## NanoString norm
+    #x <- countTable[,!colnames(countTable) %in% c("CodeClass", "Name", "Accession")]
     ## multiply normalization factor by raw counts
-    x <- t(apply(x, MARGIN = 1, FUN = '*', pos.norm.factors$mean));
-
-    ## 02 SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
+    #x <- t(apply(x, MARGIN = 1, FUN = '*', pos.norm.factors$mean));
+    ## SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
     ## Normalize by substracting geometric mean of housekeeping genes from each endogenous gene
-
-    hk_genes=countTable[countTable$CodeClass=="Housekeeping","Name"]
-
+    #hk_genes=countTable[countTable$CodeClass=="Housekeeping","Name"]
     ## calculate the normalization factor: arithmetic mean of the geometric means of positive controls
-    rna.content <- apply(x[rownames(x) %in% hk_genes,], MARGIN=2, FUN=geoMean);
-    hk.norm.factor <- mean(rna.content) / rna.content
-
-    x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
-    x.norm <- log2(x.norm + 1);
-
+    #rna.content <- apply(x[rownames(x) %in% hk_genes,], MARGIN=2, FUN=geoMean);
+    #hk.norm.factor <- mean(rna.content) / rna.content
+    #x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
+    #x.norm <- log2(x.norm + 1);
     ## return endogenous probes
-    ns.norm <- x.norm[rownames(x.norm) %in% countTable[countTable$CodeClass=="Endogenous","Name"],]
+    #ns.norm <- x.norm[rownames(x.norm) %in% countTable[countTable$CodeClass=="Endogenous","Name"],]
     ##------------------------
-
-    ## new sample; proper delimiter for ordinal regression
-    new.ns.norm.or <- data.frame(counts=ns.norm[,newID])
-    colnames(new.ns.norm.or) <- newID
-
-    ## TODO: prevent gene delimiter modification in model output
-    rownames(ns.norm) <- gsub("-", ".", rownames(ns.norm))
-    rownames(ns.norm) <- gsub("/", ".", rownames(ns.norm))
-    rownames(ns.norm) <- gsub(" ", ".", rownames(ns.norm))
 
     ## new sample(s) normalized with refSet
-    new.ns.norm <- data.frame(counts=ns.norm[,newID])
+    new.ns.norm <- data.frame(counts=ns.norm[,newID], check.names=FALSE)
     colnames(new.ns.norm) <- newID
 
     ##--------------------------
     ## BKV expression: new biopsy v. normal and BKV refset samples
     ##--------------------------
-    bk_genes <- c("BK..large.T.Ag", "BK..VP1")
-    norm_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_normal,])
-    bk_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% c("NBKv"),])
+    bk_genes <- c("BK  large T Ag", "BK  VP1")
+    norm_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% dx_normal,])
+    bk_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% c("BK virus nephropathy"),])
 
     bk_counts <- data.frame(ns.norm[,colnames(ns.norm) %in% c(norm_bx_ids, bk_bx_ids, newID)], check.names=FALSE)
     bk_counts <- bk_counts[rownames(bk_counts) %in% bk_genes,]
@@ -239,7 +237,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #bkv_tab <- bkv_tab[bkv_tab$new_counts>bkv_tab$upper_sd | bkv_tab$new_counts<bkv_tab$lower_sd,]
 
     ## boxplot
-    dat <- data.frame(t(bk_counts), check.names=TRUE)
+    dat <- data.frame(t(bk_counts), check.names=FALSE)
     dat[] <- sapply(dat[], as.numeric)
     #dat$BK_mean <- apply(dat[,1:2], 1, mean)
     
@@ -250,29 +248,22 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     suppressWarnings({dat.m <- reshape2::melt(dat, id.vars="group")})
     bkv_boxplot <- ggplot(dat.m, aes(x = forcats::fct_rev(group), y = value, fill=group)) + geom_boxplot() +
       xlab("") + ylab("normalized expression") +
-      scale_fill_manual(values=c("blue3",  "lightsteelblue", "orange")) +
+      scale_fill_manual(values=c("navy",  "lightsteelblue", "orange")) +
       theme(legend.position="none", panel.border=element_rect(colour="gray", fill=NA, size=1),
             axis.text=element_text(size=16, color="black"), axis.title=element_text(size=16, color="black"),
             panel.background=element_blank(), panel.grid.minor=element_line(colour="gray"))
 
     ## Wilcoxon rank sum test
-    new_exp <- c(dat[dat$group %in% c("new"),"BKVP1"], dat[dat$group %in% c("new"),"BKlargeTAg"])
-    bkv_exp <- c(dat[dat$group %in% c("BKV"),"BKVP1"], dat[dat$group %in% c("BKV"),"BKlargeTAg"])
-    norm_exp <- c(dat[dat$group %in% c("normal"),"BKVP1"], dat[dat$group %in% c("normal"),"BKlargeTAg"])
+    new_exp <- c(dat[dat$group %in% c("new"),"BK  VP1"], dat[dat$group %in% c("new"),"BK  large T Ag"])
+    bkv_exp <- c(dat[dat$group %in% c("BKV"),"BK  VP1"], dat[dat$group %in% c("BKV"),"BK  large T Ag"])
+    norm_exp <- c(dat[dat$group %in% c("normal"),"BK  VP1"], dat[dat$group %in% c("normal"),"BK  large T Ag"])
     
+    suppressWarnings({
     new_greater_norm_pval <- wilcox.test(new_exp, norm_exp, paired=FALSE, alternative="greater")$p.value
     new_greater_bkv_pval <- wilcox.test(new_exp, bkv_exp, paired=FALSE, alternative="greater")$p.value
     new_less_bkv_pval <- wilcox.test(new_exp, bkv_exp, paired=FALSE, alternative="less")$p.value
+    })
     
-    ## BK VP1
-    # vp1_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
-    # vp1_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKVP1"], dat[dat$group %in% c("BKV"),"BKVP1"], paired=FALSE, alternative="less")$p.value
-    # vp1_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKVP1"], dat[dat$group %in% c("normal"),"BKVP1"], paired=FALSE, alternative="greater")$p.value
-    # BK large T Ag
-    # tag_new_norm_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
-    # tag_new_bkv_pval <- wilcox.test(dat[dat$group %in% c(newID),"BKlargeTAg"], dat[dat$group %in% c("BKV"),"BKlargeTAg"], paired=FALSE, alternative="less")$p.value
-    # tag_bkv_norm_pval <- wilcox.test(dat[dat$group %in% c("BKV"),"BKlargeTAg"], dat[dat$group %in% c("normal"),"BKlargeTAg"], paired=FALSE, alternative="greater")$p.value
-   
     # interpretation (for molecualr report)
     # alternate hypothesis=new > normal
     new_greater_normal_results <- ifelse(new_greater_norm_pval > 0.05, "BKV expression is not significantly higher than normal biopsies",
@@ -306,8 +297,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##--------------------------
     ## signaling pathways
     ##--------------------------
-    norm_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_normal,])
-    #norm_bx_ids <- rownames(mscores_ref[mscores_ref$Dx %in% dx_no_rejection,])
+    norm_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% dx_normal,])
 
     new_counts <- ns.norm[,colnames(ns.norm) %in% newID]
     new_counts <- data.frame(gene=rownames(ns.norm),
@@ -516,6 +506,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
                                  k=nrow(new_top_genes), lower.tail=FALSE)
     pathway_table <- pathway_table[order(pathway_table$pval, decreasing=F),]
     pathway_table$qval<-1.0
+    
     ## adjust p value for pathways with count>0
     pathway_table[pathway_table$Count!=0,"qval"] <- round(p.adjust(pathway_table[pathway_table$Count!=0,"pval"], method="BH"), 3)
 
@@ -526,6 +517,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
                                  k=nrow(new_top_genes), lower.tail=FALSE)
     cell_type_table <- cell_type_table[order(cell_type_table$pval, decreasing=F),]
     cell_type_table$qval<-1.0
+    
     ## adjust p value for cell types with count>0
     cell_type_table[cell_type_table$Count!=0,]$qval <- round(p.adjust(cell_type_table[cell_type_table$Count!=0,"pval"], method="BH"), 3)
 
@@ -560,212 +552,97 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #         axis.title.y=element_text(size=12, family="sans", colour="black"))
 
     ##--------------------------
-    ## predict Dx/Banff score probabilities
-    ##--------------------------
-    ## predict normal prob for new sample(s)
-    #normal.genes <- rownames(normal.model$scaling) #LDA
-    normal.genes <- names(normal.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% normal.genes]
-
-    #new.normal.pred <- stats::predict(normal.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.normal.pred <- stats::predict(normal.model, newdata=data.frame(t(new.ge)), type="response")
-
-    new.normal.pred <- data.frame(new.normal.pred)
-    #new.normal.pred$ID <- rownames(new.normal.pred)
-    new.normal.pred$ID <- newID
-    #new.normal.pred$other <- NULL #LDA
-    colnames(new.normal.pred)<-c("normal_binary", "ID")
-
-    ##--------------------------
-    ## predict AMR prob for new sample(s)
-    #amr.genes <- rownames(amr.model$scaling) #LDA
-    amr.genes <- names(amr.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% amr.genes]
-
-    #new.amr.pred <- stats::predict(amr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.amr.pred <- stats::predict(amr.model, newdata=data.frame(t(new.ge)), type="response")
-
-    new.amr.pred <- data.frame(new.amr.pred)
-    #new.amr.pred$ID <- rownames(new.amr.pred)
-    new.amr.pred$ID <- newID
-    #new.amr.pred$other <- NULL #LDA
-    colnames(new.amr.pred)<-c("amr_binary", "ID")
-
-    ##--------------------------
-    ## predict TCMR prob for new sample(s)
-    #tcmr.genes <- rownames(tcmr.model$scaling) #LDA
-    tcmr.genes <- names(tcmr.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% tcmr.genes]
-
-    #new.tcmr.pred <- stats::predict(tcmr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.tcmr.pred <- stats::predict(tcmr.model, newdata=data.frame(t(new.ge)), type="response")
-
-    new.tcmr.pred <- data.frame(new.tcmr.pred)
-    #new.tcmr.pred$ID <- rownames(new.tcmr.pred)
-    new.tcmr.pred$ID <- newID
-    #new.tcmr.pred$other <- NULL #LDA
-    colnames(new.tcmr.pred)<-c("tcmr_binary", "ID")
-
-    ##--------------------------
-    ## predict acute TCMR prob for new sample(s)
-    #atcmr.genes <- rownames(atcmr.model$scaling) #LDA
-    atcmr.genes <- names(atcmr.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% atcmr.genes]
-
-    #new.atcmr.pred <- stats::predict(atcmr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.atcmr.pred <- stats::predict(atcmr.model, newdata=data.frame(t(new.ge)), type="response")
-
-    new.atcmr.pred <- data.frame(new.atcmr.pred)
-    #new.atcmr.pred$ID <- rownames(new.atcmr.pred)
-    new.atcmr.pred$ID <- newID
-    #new.atcmr.pred$other <- NULL #LDA
-    colnames(new.atcmr.pred)<-c("atcmr_binary", "ID")
-
-    ##--------------------------
-    ## predict chronic active TCMR prob for new sample(s)
-    #catcmr.genes <- rownames(catcmr.model$scaling) #LDA
-    catcmr.genes <- names(catcmr.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% catcmr.genes]
-
-    #new.catcmr.pred <- stats::predict(catcmr.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.catcmr.pred <- stats::predict(catcmr.model, newdata=data.frame(t(new.ge)), type="response")
-
-    new.catcmr.pred <- data.frame(new.catcmr.pred)
-    #new.catcmr.pred$ID <- rownames(new.catcmr.pred)
-    new.catcmr.pred$ID <- newID
-    #new.catcmr.pred$other <- NULL #LDA
-    colnames(new.catcmr.pred)<-c("catcmr_binary", "ID")
-
-    ##--------------------------
-    ## predict IFTA prob for new sample(s)
-    #ifta.genes <- rownames(ifta.model$scaling) #LDA
-    ifta.genes <- names(ifta.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% ifta.genes]
-
-    #new.ifta.pred <- stats::predict(ifta.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.ifta.pred <- stats::predict(ifta.model, newdata=data.frame(t(new.ge)), type="response")
-
-    new.ifta.pred <- data.frame(new.ifta.pred)
-    #new.ifta.pred$ID <- rownames(new.ifta.pred)
-    new.ifta.pred$ID <- newID
-    #new.ifta.pred$other <- NULL #LDA
-    colnames(new.ifta.pred)<-c("ifta_binary", "ID")
-
-    ##--------------------------
-    ## Predict multivarate Dx
-    multi.genes <- multi.model$coefnames[-1] #LR
+    ## Diagnostic base models
+    dx.genes <- colnames(coef(glm.model$finalModel))
+    dx.genes <- dx.genes[grep("Intercept", dx.genes, invert=TRUE)]
+    dx.genes <- gsub("`", "", dx.genes)
     
     new.ge <- new.ns.norm
+    
     new.ge <- data.frame(t(new.ge), check.names=FALSE)
-    new.ge <- new.ge[,colnames(new.ge) %in% multi.genes]
+    new.ge <- new.ge[,colnames(new.ge) %in% dx.genes]
     
-    ## must load 'nnet' packge for predict to work
-    new.dx.pred <- data.frame(Dx=stats::predict(multi.model, newdata=new.ge, type="probs"))
-    new.dx.pred <- data.frame(t(new.dx.pred))
-    new.dx.pred$ID <- newID
+    ## base model prediction
+    glm.preds <- predict(glm.model, newdata = new.ge, type='prob')
+    c5.preds <- predict(c5.model, newdata = new.ge, type='prob')
+    gbm.preds <- predict(gbm.model, newdata = new.ge, type='prob')
+    knn.preds <- predict(knn.model, newdata = new.ge, type='prob')
+    lda.preds <- predict(lda.model, newdata = new.ge, type='prob')
+    rf.preds <- predict(rf.model, newdata = new.ge, type='prob')
+    svm.preds <- predict(svm.model, newdata = new.ge, type='prob')
+    xgb.preds <- predict(xgb.model, newdata = new.ge, type='prob')
+    
+    colnames(glm.preds) <- paste0(colnames(glm.preds), ".glm")
+    colnames(c5.preds) <- paste0(colnames(c5.preds), ".c5")
+    colnames(gbm.preds) <- paste0(colnames(gbm.preds), ".gbm")
+    colnames(knn.preds) <- paste0(colnames(knn.preds), ".knn")
+    colnames(lda.preds) <- paste0(colnames(lda.preds), ".lda")
+    colnames(rf.preds) <- paste0(colnames(rf.preds), ".rf")
+    colnames(svm.preds) <- paste0(colnames(svm.preds), ".svm")
+    colnames(xgb.preds) <- paste0(colnames(svm.preds), ".xgb")
+    
+    all.preds <- cbind(glm.preds, c5.preds, gbm.preds, knn.preds, lda.preds, rf.preds, svm.preds, xgb.preds)
+    all.preds$ID <- rownames(all.preds)
+    
+    ## Calculate median score across base models + medianCIs
+    ## AMR
+    amr.preds <- all.preds[,grep("amr", colnames(all.preds))]
+    amr.preds[] <- lapply(amr.preds[], as.numeric)
+    amr_ci <- apply(amr.preds, 1, function(x) { DescTools::MedianCI(x, conf.level=0.95, method="boot") })
+    amr.preds$median <- amr_ci[1,] #ensemble score
+    amr.preds$lwr.ci <- amr_ci[2,]
+    amr.preds$upr.ci <- amr_ci[3,]
+    amr.preds$lwr.ci[amr.preds$lwr.ci<0]<-0
+    amr.preds$upr.ci[amr.preds$upr.ci>1]<-1
+
+    ## TCMR
+    tcmr.preds <- all.preds[,grep("tcmr", colnames(all.preds))]
+    tcmr.preds[] <- lapply(tcmr.preds[], as.numeric)
+    tcmr_ci <- apply(tcmr.preds, 1, function(x) { DescTools::MedianCI(x, conf.level=0.95, method="boot") })
+    tcmr.preds$median <- tcmr_ci[1,] #ensemble score
+    tcmr.preds$lwr.ci <- tcmr_ci[2,]
+    tcmr.preds$upr.ci <- tcmr_ci[3,]
+    tcmr.preds$lwr.ci[tcmr.preds$lwr.ci<0]<-0
+    tcmr.preds$upr.ci[tcmr.preds$upr.ci>1]<-1
+    
+    ## normal: no rejection or injury diagnosis
+    normal.preds <- all.preds[,grep("normal", colnames(all.preds))]
+    normal.preds[] <- lapply(normal.preds[], as.numeric)
+    normal_ci <- apply(normal.preds, 1, function(x) { DescTools::MedianCI(x, conf.level=0.95, method="boot") })
+    normal.preds$median <- normal_ci[1,] #ensemble score
+    normal.preds$lwr.ci <- normal_ci[2,]
+    normal.preds$upr.ci <- normal_ci[3,]
+    normal.preds$lwr.ci[normal.preds$lwr.ci<0]<-0
+    normal.preds$upr.ci[normal.preds$upr.ci>1]<-1
+    
+    ## other: injury without rejection
+    other.preds <- all.preds[,grep("other", colnames(all.preds))]
+    other.preds[] <- lapply(other.preds[], as.numeric)
+    other_ci <- apply(other.preds, 1, function(x) { DescTools::MedianCI(x, conf.level=0.95, method="boot") })
+    other.preds$median <- other_ci[1,] #ensemble score
+    other.preds$lwr.ci <- other_ci[2,]
+    other.preds$upr.ci <- other_ci[3,]
+    other.preds$lwr.ci[other.preds$lwr.ci<0]<-0
+    other.preds$upr.ci[other.preds$upr.ci>1]<-1
+    
+    ## ensemble predictions + confidence intervals
+    ensemble.preds <- data.frame(ID=rownames(amr.preds),
+    			     amr=amr.preds$median, amr_lwr_ci=amr.preds$lwr.ci, amr_upr_ci=amr.preds$upr.ci,
+    			     tcmr=tcmr.preds$median, tcmr_lwr_ci=tcmr.preds$lwr.ci, tcmr_upr_ci=tcmr.preds$upr.ci,
+    			     normal=normal.preds$median, normal_lwr_ci=normal.preds$lwr.ci, normal_upr_ci=normal.preds$upr.ci,
+    			     other=other.preds$median, other_lwr_ci=other.preds$lwr.ci, other_upr_ci=other.preds$upr.ci)
+    rownames(ensemble.preds) <- ensemble.preds$ID
+    
+    new.dx.pred <- ensemble.preds 
     
     ##--------------------------
-    ## predict prob g>0 for new sample(s)
-    ##g0.genes <- rownames(g0_score.model$scaling) #LDA
-    g0.genes <- names(g0_score.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% g0.genes]
-
-    #new.pred <- stats::predict(g0_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(g0_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
-
-    new.pred <- data.frame(new.pred)
-    #new.pred$ID <- rownames(new.pred)
-    new.pred$ID <- newID
-    new.pred$low <- NULL
-    new.g0.pred <- new.pred
-    colnames(new.g0.pred)<-c("g0_binary", "ID")
-
-    ##--------------------------
-    ## predict prob ptc>0 for new sample(s)
-    ##ptc0.genes <- rownames(ptc0_score.model$scaling) #LDA
-    ptc0.genes <- names(ptc0_score.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% ptc0.genes]
-
-    #new.pred <- stats::predict(ptc0_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(ptc0_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
-
-    new.pred <- data.frame(new.pred)
-    #new.pred$ID <- rownames(new.pred)
-    new.pred$ID <- newID
-    new.pred$low <- NULL
-    new.ptc0.pred <- new.pred
-    colnames(new.ptc0.pred) <- c("ptc0_binary", "ID")
-
-    ##--------------------------
-    ## predict prob i>1 for new samples
-    ##i1.genes <- rownames(i1_score.model$scaling) #LDA
-    i1.genes <- names(i1_score.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% i1.genes]
-
-    #new.pred <- stats::predict(i1_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(i1_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
-
-    new.pred <- data.frame(new.pred)
-    #new.pred$ID <- rownames(new.pred)
-    new.pred$ID <- newID
-    new.pred$low <- NULL
-    new.i1.pred <- new.pred
-    colnames(new.i1.pred) <- c("i1_binary", "ID")
-
-    ##--------------------------
-    ## predict prob t>1 for new samples
-    #t1.genes <- rownames(t1_score.model$scaling) #LDA
-    t1.genes <- names(t1_score.model$coefficients)[-1] #LR
-
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% t1.genes]
-
-    #new.pred <- stats::predict(t1_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(t1_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
-
-    new.pred <- data.frame(new.pred)
-    #new.pred$ID <- rownames(new.pred)
-    new.pred$ID <- newID
-    new.pred$low <- NULL
-    new.t1.pred <- new.pred
-    colnames(new.t1.pred) <- c("t1_binary", "ID")
-
-    ##--------------------------
-    ## ordinal regression
+    ## Banff lesions
 
     ## g score
     g.genes <- names(g_score.model$coefficients)[-c(1:3)]
     g.genes <- gsub("`", '', g.genes)
 
-    new.ge <- new.ns.norm.or
+    new.ge <- new.ns.norm
     new.ge <- data.frame(t(new.ge), check.names=FALSE)
     new.ge <- new.ge[,colnames(new.ge) %in% g.genes]
 
@@ -777,7 +654,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ptc.genes <- names(ptc_score.model$coefficients)[-c(1:3)]
     ptc.genes <- gsub("`", '', ptc.genes)
 
-    new.ge <- new.ns.norm.or
+    new.ge <- new.ns.norm
     new.ge <- data.frame(t(new.ge), check.names=FALSE)
     new.ge <- new.ge[,colnames(new.ge) %in% ptc.genes]
 
@@ -789,7 +666,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     i.genes <- names(i_score.model$coefficients)[-c(1:3)]
     i.genes <- gsub("`", '', i.genes)
 
-    new.ge <- new.ns.norm.or
+    new.ge <- new.ns.norm
     new.ge <- data.frame(t(new.ge), check.names=FALSE)
     new.ge <- new.ge[,colnames(new.ge) %in% i.genes]
 
@@ -801,7 +678,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     t.genes <- names(t_score.model$coefficients)[-c(1:3)]
     t.genes <- gsub("`", '', t.genes)
 
-    new.ge <- new.ns.norm.or
+    new.ge <- new.ns.norm
     new.ge <- data.frame(t(new.ge), check.names=FALSE)
     new.ge <- new.ge[,colnames(new.ge) %in% t.genes]
 
@@ -810,17 +687,20 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     new.t.pred$ID <- newID
 
     ##--------------------------
+    ## modify gene names for chronic lesion models
+    new.ge <- new.ns.norm
+    rownames(new.ge) <- gsub("-", ".", rownames(new.ge))
+    rownames(new.ge) <- gsub("/", ".", rownames(new.ge))
+    rownames(new.ge) <- gsub(" ", ".", rownames(new.ge))
+    
+    ##--------------------------
     ## predict prob ci>1 for new sample(s)
-    #ci1.genes <- rownames(ci1_score.model$scaling) #LDA
     ci1.genes <- names(ci1_score.model$coefficients)[-1] #LR
 
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% ci1.genes]
+    new.ci <- t(new.ge)
+    new.ci <- new.ci[,colnames(new.ci) %in% ci1.genes]
 
-    #new.pred <- stats::predict(ci1_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(ci1_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
-
+    new.pred <- stats::predict(ci1_score.model, newdata=data.frame(t(new.ci)), type="response") #LR
     new.pred <- data.frame(new.pred)
     new.pred$ID <- newID
     new.pred$low <- NULL
@@ -829,16 +709,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##--------------------------
     ## predict prob ct>1 for new sample(s)
-    #ct1.genes <- rownames(ct1_score.model$scaling) #LDA
     ct1.genes <- names(ct1_score.model$coefficients)[-1] #LR
 
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% ct1.genes]
+    new.ct <- t(new.ge)
+    new.ct <- new.ct[,colnames(new.ct) %in% ct1.genes]
 
-    #new.pred <- stats::predict(ct1_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(ct1_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
-
+    new.pred <- stats::predict(ct1_score.model, newdata=data.frame(t(new.ct)), type="response") #LR
     new.pred <- data.frame(new.pred)
     new.pred$ID <- newID
     new.pred$low <- NULL
@@ -847,15 +723,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##--------------------------
     ## predict prob cv>1 for new sample(s)
-    #cv1.genes <- rownames(cv1_score.model$scaling) #LDA
     cv1.genes <- names(cv1_score.model$coefficients)[-1] #LR
 
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% cv1.genes]
+    new.cv <- t(new.ge)
+    new.cv <- new.cv[,colnames(new.cv) %in% cv1.genes]
 
-    #new.pred <- stats::predict(cv1_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(cv1_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
+    new.pred <- stats::predict(cv1_score.model, newdata=data.frame(t(new.cv)), type="response") #LR
 
     new.pred <- data.frame(new.pred)
     new.pred$ID <- newID
@@ -865,15 +738,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##--------------------------
     ## predict prob v>0 for new sample(s)
-    #v0.genes <- rownames(v0_score.model$scaling) #LDA
     v0.genes <- names(v0_score.model$coefficients)[-1] #LR
 
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% v0.genes]
+    new.v <- t(new.ge)
+    new.v <- new.v[,colnames(new.v) %in% v0.genes]
 
-    #new.pred <- stats::predict(v0_score.model, newdata=new.ge, type="prob")$posterior #LDA
-    new.pred <- stats::predict(v0_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
+    new.pred <- stats::predict(v0_score.model, newdata=data.frame(t(new.v)), type="response") #LR
 
     new.pred <- data.frame(new.pred)
     new.pred$ID <- newID
@@ -883,15 +753,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##--------------------------
     ## predict prob cg>0 for new samples
-    #cg0.genes <- rownames(cg0_score.model$scaling) #LDA
     cg0.genes <- names(cg0_score.model$coefficients)[-1] #LR
 
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% cg0.genes]
+    new.cg <- t(new.ge)
+    new.cg <- new.cg[,colnames(new.cg) %in% cg0.genes]
 
-    #new.pred <- stats::predict(cg0_score.model, newdata=new.ge, type="prob")$posterior
-    new.pred <- stats::predict(cg0_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
+    new.pred <- stats::predict(cg0_score.model, newdata=data.frame(t(new.cg)), type="response") #LR
 
     new.pred <- data.frame(new.pred)
     new.pred$ID <- newID
@@ -901,15 +768,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##--------------------------
     ## predict prob i_IFTA>0 for new samples
-    #iifta0.genes <- rownames(cg0_score.model$scaling) #LDA
     iifta0.genes <- names(iifta0_score.model$coefficients)[-1] #LR
 
-    new.ge <- new.ns.norm
-    new.ge <- t(new.ge)
-    new.ge <- new.ge[,colnames(new.ge) %in% iifta0.genes]
+    new.iifta <- t(new.ge)
+    new.iifta <- new.iifta[,colnames(new.iifta) %in% iifta0.genes]
 
-    #new.pred <- stats::predict(iifta0_score.model, newdata=new.ge, type="prob")$posterior
-    new.pred <- stats::predict(iifta0_score.model, newdata=data.frame(t(new.ge)), type="response") #LR
+    new.pred <- stats::predict(iifta0_score.model, newdata=data.frame(t(new.iifta)), type="response") #LR
 
     new.pred <- data.frame(new.pred)
     new.pred$ID <- newID
@@ -921,55 +785,42 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## score table
     options(scipen = 999)
     join_list <- list(new.dx.pred,
-                      new.normal.pred, new.amr.pred, new.ifta.pred,
-                      new.tcmr.pred, new.atcmr.pred, new.catcmr.pred,
-                      new.g.pred, new.ptc.pred, new.i.pred, new.t.pred, #ordinal
-                      new.g0.pred, new.ptc0.pred, new.i1.pred, new.t1.pred, #binary
+    		      new.g.pred, new.ptc.pred, new.i.pred, new.t.pred, #ordinal
                       new.cg0.pred, new.iifta0.pred, new.v0.pred,
                       new.cv1.pred, new.ci1.pred, new.ct1.pred)
     tab <- Reduce(function(...) merge(..., all=TRUE), join_list)
     rownames(tab) <- tab$ID
     
-    mscores_new <- tab ## save scores before calculating %
-    #tab <- data.frame(apply(tab[,-1], 2, function(x) {round(x, 3)*100})) #multiple samples
-    tab <- data.frame(round(tab[-1], 3) *100) #single sample
+    new_scores <- tab ## save scores before calculating %
+    tab <- data.frame(round(tab[-1], 3) *100)
     tab$ID <- rownames(tab)
-    mscores_new_pct <- tab %>% dplyr::select(ID, everything())
+    new_scores_pct <- tab %>% dplyr::select(ID, everything())
 
     ## output score table
     if(saveFiles=="TRUE") {
-      write.table(mscores_new_pct, file=paste0(newOut, "/molecular_score_table_", newID, "_", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
+      write.table(new_scores_pct, file=paste0(newOut, "/molecular_score_table_", newID, "_", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
     }
 
     options(scipen = 0)
 
     ##-----------------------
-    ## output IQR and median scores by Dx for reference biopsies
-    scores_keep <- c("AMR", "TCMR", "IFTA", "OTHER", #multivariate
-                     "amr_binary", "tcmr_binary", "catcmr_binary", "ifta_binary", "normal_binary",
-                     "g0", "g1", "g2", "g3", "ptc0", "ptc1", "ptc2", "ptc3", #ordinal
-                     "i1", "i2", "i3", "t0", "t1", "t2", "t3", #ordinal
-                     "g0_binary", "ptc0_binary", "i1_binary", "t1_binary",
-                     "cg0_binary", "iifta0_binary", "v0_binary",
-                     "ci1_binary", "ct1_binary", "cv1_binary")
+    ## output IQR and median scores by Dx for reference Dx
     
-    ref.tab <- mscores_ref ## complete Dx + molecular scores
+    ## add binary Banff lesion scores
+    ref.tab <- merge(dx_ref, banff_ref[,c("ID", "iifta0_binary", "v0_binary", "cg0_binary", "ti1_binary", "cv1_binary", 
+    				      "ci1_binary", "ct1_binary")], by="ID")
+    rownames(ref.tab) <- ref.tab$ID
+    
+    dx_scores <- c("amr", "tcmr", "normal", "other", "iifta0_binary", "v0_binary", "cg0_binary", "ti1_binary", "cv1_binary", 
+    	       "ci1_binary", "ct1_binary")
     #ref.tab <- ref.tab[apply(ref.tab[,-1], 1, function(x) { all(!is.na(x)) }),] #exclude samples without all molecular scores
-
-    ## simplify Dx
-    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_amr, "AMR", ref.tab$Dx)
-    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_tcmr, "TCMR", ref.tab$Dx)
-    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_normal, "No specific Dx", ref.tab$Dx)
-    ref.tab$Dx <- ifelse(ref.tab$Dx %in% dx_ifta, "IFTA", ref.tab$Dx)
-    ref.tab$Dx <- ifelse(!ref.tab$Dx %in% c("AMR", "TCMR", "No specific Dx", "IFTA"), "OTHER", ref.tab$Dx)
     
     ## IQR = Q3 - Q1
     ## Q0= min and Q5=max
-    ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx=="AMR",scores_keep], 2, quantile, na.rm=TRUE)
-    ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="TCMR",scores_keep], 2, quantile, na.rm=TRUE)
-    ref.ifta.quantiles <- apply(ref.tab[ref.tab$Dx=="IFTA",scores_keep], 2, quantile, na.rm=TRUE)
-    ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx=="No specific Dx",scores_keep], 2, quantile, na.rm=TRUE)
-    ref.other.quantiles <- apply(ref.tab[ref.tab$Dx=="OTHER",scores_keep], 2, quantile, na.rm=TRUE)
+    ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="amr",dx_scores], 2, quantile, na.rm=TRUE)
+    ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="tcmr",dx_scores], 2, quantile, na.rm=TRUE)
+    ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="normal",dx_scores], 2, quantile, na.rm=TRUE)
+    ref.other.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="other",dx_scores], 2, quantile, na.rm=TRUE)
     
     ref.amr.quantiles <- data.frame(apply(ref.amr.quantiles, 2, function(x) {round(x, 3)*100}))
     ref.amr.quantiles$Dx <- "AMR"
@@ -979,173 +830,86 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ref.tcmr.quantiles$Dx <- "TCMR"
     ref.tcmr.quantiles$Q <- rownames(ref.tcmr.quantiles)
 
-    ref.ifta.quantiles <- data.frame(apply(ref.ifta.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.ifta.quantiles$Dx <- "IFTA"
-    ref.ifta.quantiles$Q <- rownames(ref.ifta.quantiles)
-
     ref.normal.quantiles <- data.frame(apply(ref.normal.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.normal.quantiles$Dx <- "No specific Dx"
+    ref.normal.quantiles$Dx <- "NONREJECTION"
     ref.normal.quantiles$Q <- rownames(ref.normal.quantiles)
     
     ref.other.quantiles <- data.frame(apply(ref.other.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.other.quantiles$Dx <- "OTHER"
+    ref.other.quantiles$Dx <- "INJURY"
     ref.other.quantiles$Q <- rownames(ref.other.quantiles)
 
-    ref.score.quantiles <- rbind(ref.amr.quantiles, ref.tcmr.quantiles, ref.ifta.quantiles, ref.normal.quantiles, ref.other.quantiles)
-    #write.table(ref.score.quantiles, file=paste0(newOut, "/refset_score_quantiles", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
-
-    ## resfset median scores (needed to reorder boxplots)
-    ref.amr.median <- apply(ref.tab[ref.tab$Dx=="AMR",scores_keep], 2, median, na.rm=TRUE)
-    ref.tcmr.median <- apply(ref.tab[ref.tab$Dx=="TCMR",scores_keep], 2, median, na.rm=TRUE)
-    ref.ifta.median <- apply(ref.tab[ref.tab$Dx=="IFTA",scores_keep], 2, median, na.rm=TRUE)
-    ref.normal.median <- apply(ref.tab[ref.tab$Dx=="No specific Dx",scores_keep], 2, median, na.rm=TRUE)
-    ref.other.median <- apply(ref.tab[ref.tab$Dx=="OTHER",scores_keep], 2, median, na.rm=TRUE)
-    #ref.scores <- rbind(ref.amr.median, ref.tcmr.median, ref.normal.median)
-    #ref.scores <- data.frame(apply(ref.scores, 1, function(x) {round(x, 3)*100}))
-    #colnames(ref.scores) <- gsub("ref.", "", colnames(ref.scores))
-    #ref.scores$score <- rownames(ref.scores)
-    ##write.table(ref.scores, file=paste0(newOut, "/refset_median_scores_", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
-
+    ref.score.quantiles <- rbind(ref.amr.quantiles, ref.tcmr.quantiles, ref.normal.quantiles, ref.other.quantiles)
+    
     ##----------------------------------------------
     ## boxplots of reference biopsy molecular scores
-    ## AMR
-    dat <- ref.tab[ref.tab$Dx=="AMR",]
-    dat <- dat[,scores_keep]
-    amr_order <- names(ref.amr.median[order(ref.amr.median, decreasing=F)])
-    ## order by median scores (reorder not working)
-    dat <- dat[,amr_order]
+    dat <- ref.tab[ref.tab$Dx_simple=="amr",]
+    dat <- dat[,dx_scores]
+    #amr_order <- names(ref.amr.median[order(ref.amr.median, decreasing=F)])
+    #dat <- dat[,amr_order]
     colnames(dat) <- gsub("_score", "", colnames(dat))
     suppressWarnings({
       dat.m <- reshape2::melt(dat)
     })
     dat.m$value <- dat.m$value * 100
 
-    #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) +
-    boxplot_amr <- ggplot(data=dat.m, aes(x=variable, y=value)) +
-        ggtitle("AMR reference biopsies") +
-        ylab("molecular score (%)") + xlab("") +
-        geom_hline(yintercept=50, linetype="dashed", color="slategray") +
-        geom_boxplot(color="steelblue4", fill="whitesmoke") +
-        theme(legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"),
-              panel.grid.major=element_blank(),
-              panel.background=element_blank(),
-              axis.line=element_line(colour="white"),
-              axis.text.x=element_text(face="bold", size=14, angle=0),
-              axis.title.x=element_text(face="bold", size=14, angle=0),
-              axis.text.y=element_text(size=14, angle=0),
-              axis.title.y=element_text(face="bold", size=14),
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+    boxplot_amr <- ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) +
+    	ggtitle("AMR reference biopsies") +
+    	ylab("molecular score (%)") + xlab("") + ylim(c(0, 100)) +
+    	geom_hline(yintercept=50, linetype="dashed", color="slategray") +
+    	geom_boxplot(color="steelblue4", fill="whitesmoke") +
+    	theme(legend.title=element_blank(),
+    	      panel.grid.minor=element_line(colour="gray"),
+    	      panel.grid.major=element_blank(),
+    	      panel.background=element_blank(),
+    	      axis.line=element_line(colour="white"),
+    	      axis.text.x=element_text(face="bold", size=14, angle=0),
+    	      axis.title.x=element_text(face="bold", size=14, angle=0),
+    	      axis.text.y=element_text(size=14, angle=0),
+    	      axis.title.y=element_text(face="bold", size=14),
+    	      panel.border=element_rect(colour="gray", fill=NA, size=1))
     #ggsave(paste0(newOut, "/amr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_amr, device="pdf", width=8, height=6)
-
-    ## TCMR
-    dat <- ref.tab[ref.tab$Dx=="TCMR",]
-    dat <- dat[,scores_keep]
-    tcmr_order <- names(ref.tcmr.median[order(ref.tcmr.median, decreasing=F)])
-    ## order by median scores (reorder not working)
-    dat <- dat[,tcmr_order]
-    colnames(dat) <- gsub("_score", "", colnames(dat))
-    suppressWarnings({
-      dat.m <- data.table::melt(dat)
-    })
-    dat.m$value <- dat.m$value * 100
-    boxplot_atcmr <- ggplot(data=dat.m, aes(x=variable, y=value)) +
-        ggtitle("TCMR reference biopsies") +
-        ylab("molecular score (%)") + xlab("") +
-        geom_hline(yintercept=50, linetype="dashed", color="slategray") +
-        geom_boxplot(color="steelblue4", fill="whitesmoke") +
-        theme(legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"),
-              panel.grid.major=element_blank(),
-              panel.background=element_blank(),
-              axis.line=element_line(colour="white"),
-              axis.text.x=element_text(face="bold", size=14, angle=0),
-              axis.title.x=element_text(face="bold", size=14, angle=0),
-              axis.text.y=element_text(size=14, angle=0),
-              axis.title.y=element_text(face="bold", size=14),
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #ggsave(paste0(newOut, "/atcmr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_tcmr, device="pdf", width=8, height=6)
-
-    ## Normal
-    dat <- ref.tab[ref.tab$Dx=="No specific Dx",]
-    dat <- dat[,scores_keep]
-    normal_order <- names(ref.normal.median[order(ref.normal.median, decreasing=F)])
-    ## order by median scores (reorder not working)
-    dat <- dat[,normal_order]
-    colnames(dat) <- gsub("_score", "", colnames(dat))
-    suppressWarnings({
-      dat.m <- data.table::melt(dat)
-    })
-    dat.m$value <- dat.m$value * 100
-
-    #ggplot(data=dat.m, aes(x=reorder(variable, value, median, order=TRUE), y=value)) +
-    boxplot_normal <- ggplot(data=dat.m, aes(x=variable, y=value)) +
-        ggtitle("No specific Dx reference biopsies") +
-        ylab("molecular score (%)") + xlab("") + ylim(c(0, 100)) +
-        geom_hline(yintercept=50, linetype="dashed", color="slategray") +
-        geom_boxplot(color="steelblue4", fill="whitesmoke") +
-        theme(legend.title=element_blank(),
-              panel.grid.minor=element_line(colour="gray"),
-              panel.grid.major=element_blank(),
-              panel.background=element_blank(),
-              axis.line=element_line(colour="white"),
-              axis.text.x=element_text(face="bold", size=14, angle=0),
-              axis.title.x=element_text(face="bold", size=14, angle=0),
-              axis.text.y=element_text(size=14, angle=0),
-              axis.title.y=element_text(face="bold", size=14),
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #ggsave(paste0(newOut, "/normal_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_normal, device="pdf", width=8, height=6)
 
     ##--------------------------
     ## combine refset and new molecular scores
     ## scores to input to PCA
-    pca_scores <- c("AMR", "TCMR", "IFTA", "OTHER") #multivariate
-    #pca_scores <- c("normal_binary", "amr_binary", "tcmr_binary", "ifta_binary")
-    #pca_scores <- c("g0_binary", "ptc0_binary", "cg0_binary", "i1_binary", "t1_binary")
+    pca_scores <- c("amr", "tcmr", "normal")
     #pca_scores <- c("g0", "g1", "g2", "g3", "ptc0", "ptc1", "ptc2", "ptc3",
     #                "i0", "i1", "i2", "i3", "t0", "t1", "t2", "t3")
 
     ## keep only Bx with all molecular scores
-    mscores_pca <- mscores_ref[apply(mscores_ref[,pca_scores], 1, function(x) { all(!is.na(x)) }),]
-
-    mscores_pca <- rbind(mscores_pca[,pca_scores], mscores_new[,pca_scores])
+    mscores_pca <- ref.tab[apply(ref.tab[,pca_scores], 1, function(x) { all(!is.na(x)) }),]
+	
+    ## add scores for new sample
+    mscores_pca <- rbind(mscores_pca[,pca_scores], new_scores[,pca_scores])
 
     resPCA <- FactoMineR::PCA(mscores_pca[,!colnames(mscores_pca) %in% "ID"], scale.unit=FALSE, ncp=5, graph=FALSE)
 
     pca.df <- as.data.frame(resPCA$ind$coord)
     pca.df$ID <- rownames(pca.df)
 
-    pca.df <- merge(pca.df, mscores_ref[,c("ID", "Dx")], by="ID", all.x=TRUE)
-    pca.df$Dx <- ifelse(pca.df$ID %in% mscores_new$ID, "new", pca.df$Dx)
+    pca.df <- merge(pca.df, ref.tab[,c("ID", "Dx")], by="ID", all.x=TRUE)
+    pca.df$Dx <- ifelse(pca.df$ID %in% new_scores$ID, "new", pca.df$Dx)
 
-    ## higlight new biopsy
+    ## simplify Dx
+    pca.df$Dx <- ifelse(pca.df$Dx %in% c(dx_amr, dx_tcmr, dx_normal, "new"), pca.df$Dx, "Injury w/o rejection")
+    #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_normal, "No rejection/injury Dx", pca.df$Dx)
+       
+    ## highlight new biopsy
     pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx!="new", "ref", "new"))
 
-    ## simple Dx
-    pca.df$Dx <- ifelse(pca.df$Dx %in% c("Chronic (+/- active) AMR"), "Chronic active AMR", pca.df$Dx)
-    #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_amr, "AMR", pca.df$Dx)
-    #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_tcmr, "TCMR", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_normal, "No specific Dx", pca.df$Dx)
-    pca.df$Dx <- ifelse(pca.df$Dx %in% dx_ifta, "IFTA", pca.df$Dx)
-
-    #pca.df <- pca.df[pca.df$Dx %in% c("AMR", "TCMR", "ATI", "IFTA", "No specific Dx", "new"),]
-    pca.df <- pca.df[pca.df$Dx %in% c("Active AMR",  "Chronic active AMR", "Acute TCMR", "Chronic active TCMR", "IFTA", "No specific Dx", "new"),]
-
-    #my_cols=c("firebrick", "#009E73", "gray80", "black", "blue3") #steelblue;dodgerblue
-    my_cols=c("darkred", "blue3", "tomato", "dodgerblue", "#009E73", "lightsteelblue", "black")
-    paste(levels(factor(pca.df$Dx)), my_cols)
-    #table(pca.df$Dx)
-    #nrow(pca.df)
-    
+    #col_vector=c("firebrick",  "blue3", "mediumpurple", "turquoise", "orangered", "dodgerblue", "salmon",
+    #	     "olivedrab2","darkgreen", "black", "palegreen", "lightgray")
+    col_vector=c("firebrick",  "blue3", "salmon", "dodgerblue", "orangered", "lightgray", "black", "gray36")
+    	     
     pca_new_1_2 <- ggplot() +
-        scale_fill_manual(values=my_cols) +
+        scale_fill_manual(values=col_vector) +
         #geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) +
         geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=3, alpha=0.8) +
         geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
         #geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=2, colour="orange") +
         xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
         ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-        theme(legend.position="right", legend.title=element_blank(),
+        theme(legend.position="top", legend.title=element_blank(),
               panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
               panel.background=element_blank(),
               axis.line=element_line(colour="white"),
@@ -1156,7 +920,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
               panel.border=element_rect(colour="white", fill=NA, size=5))
 
     pca_new_2_3 <- ggplot() +
-      scale_fill_manual(values=my_cols) +
+      scale_fill_manual(values=col_vector) +
       geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.2, Dim.3, fill=Dx), shape=21, color="gray", size=3, alpha=0.7) +
       geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=4, alpha=1, fill="orange") +
       xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
@@ -1179,15 +943,13 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## KNN: k-nearest neighbors
     ##-----------------------------
     k=25
-    #knn_tab <- rbind(mscores_ref[,pca_scores], mscores_new[,pca_scores])
+    #knn_tab <- rbind(dx_ref[,pca_scores], new_scores[,pca_scores])
     knn_tab <- mscores_pca
     knn_tab$ID <- rownames(knn_tab)
     knn_tab <- merge(knn_tab, pca.df[,c("ID", "Dx", "ref")], by="ID")
 
-    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("OTHER", "AMR", "TCMR", "IFTA", "ID", "Dx")]
-    test_new <- knn_tab[knn_tab$ref %in% "new",c("OTHER", "AMR", "TCMR", "IFTA")]
-    #train_ref <- knn_tab[knn_tab$ref=="ref",c("cg", "g", "ptc", "i", "t", "ID", "Dx")]
-    #test_new <- knn_tab[knn_tab$ref=="new",c("cg0", "g0", "ptc0", "i1", "t1")]
+    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("amr", "tcmr", "normal", "ID", "Dx")]
+    test_new <- knn_tab[knn_tab$ref %in% "new",c("amr", "tcmr", "normal")]
 
     ## distance measure (for continuous features) or similarity measure (for categorical features)
     knn_res <- neighbr::knn(train_set=train_ref, k=k,
@@ -1218,13 +980,14 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##----------------
     ## banff scores of nearest neighbors
-    banff_df <- merge(nn_df, banff_ref[,c("ID", "g_score", "ptc_score", "cg_score", "i_score", "t_score")], by="ID")
+    banff_df <- merge(nn_df, banff_ref[,c("ID", "g_score", "ptc_score", "cg_score", "i_score", "t_score", "v_score")], by="ID")
 
     g_df <- data.frame(g=table(banff_df$g_score, useNA="no"))
     ptc_df <- data.frame(ptc=table(banff_df$ptc_score, useNA="no"))
     cg_df <- data.frame(cg=table(banff_df$cg_score, useNA="no"))
     i_df <- data.frame(i=table(banff_df$i_score, useNA="no"))
     t_df <- data.frame(t=table(banff_df$t_score, useNA="no"))
+    v_df <- data.frame(v=table(banff_df$v_score, useNA="no"))
 
     score_df <- data.frame(score=c("0", "1", "2", "3"))
     score_df <- merge(score_df, g_df, by.x="score", by.y="g.Var1", all=TRUE)
@@ -1232,6 +995,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     score_df <- merge(score_df, cg_df, by.x="score", by.y="cg.Var1", all=TRUE)
     score_df <- merge(score_df, i_df, by.x="score", by.y="i.Var1", all=TRUE)
     score_df <- merge(score_df, t_df, by.x="score", by.y="t.Var1", all=TRUE)
+    score_df <- merge(score_df, v_df, by.x="score", by.y="v.Var1", all=TRUE)
 
     score_df[is.na(score_df)]<-0
 
@@ -1242,7 +1006,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ##----------------
     ## mean molecular score of nearest neighbors
     ## TODO: if not all Dx in nn_dx table
-    #nn_scores <- knn_tab[knn_tab$ref=="ref",c("ID", "normal", "AMR", "TCMR", "ATI")]
+    #nn_scores <- knn_tab[knn_tab$ref=="ref",c("ID", "normal", "amr", "TCMR", "ATI")]
     #nn_scores <- nn_scores[nn_scores$ID %in% nn_df$ID,]
 
     #nn_means <- apply(nn_scores[,-1], 2, function(x) { mean(as.numeric(x)) })
@@ -1255,67 +1019,60 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #write.table(nn_dx, file=paste0(newOut, "/knn_", newID, "_", Sys.Date(), ".txt"), row.names=T, quote=F, sep='\t')
 
     ##-----------------------------
-    ## archetypal analysis: predict archetypes on unseen molecular scores
+    ## archetypal analysis: predict archetypes on new sample
     ##-----------------------------
-    ## import cluster assignment for ref biopsies
-    # mscores_aa <- read.table(mscores_aa_file, header=TRUE, sep='\t')
-    #
-    # mscores_new <- dplyr::rename(mscores_new, amr=AMR)
-    # mscores_new <- dplyr::rename(mscores_new, tcmr=TCMR)
-    # mscores_new <- dplyr::rename(mscores_new, ifta=IFTA)
-    #
-    # pred_aa <- data.frame(stats::predict(aa_model, mscores_new[,colnames(aa_model$archetypes)]))
-    # rownames(pred_aa) <- newID
-    # mscores_new$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
-    # mscores_new$Dx <- "new"
-    #
-    # mscores_aa_all <- rbind(mscores_aa, mscores_new[,colnames(mscores_aa)])
-    #
-    # pca.aa <- merge(pca.df, mscores_aa_all[,c("ID", "aa_cluster")], by="ID")
-    # pca.aa$aa_cluster <- as.factor(pca.aa$aa_cluster)
-    #
-    # pca.aa[pca.aa$ref=="new",]
-    #
-    # aa_cols=c("black", "firebrick", "gray80", "#009E73", "firebrick")
-    #
-    # pca_aa <- ggplot() +
-    #     scale_fill_manual(values=aa_cols) +
-    #     #geom_point(data=pca.aa, aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) +
-    #     geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) +
-    #     geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
-    #     #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=4, colour="orange") +
-    #     xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
-    #     ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-    #     theme(legend.position="top", legend.title=element_blank(),
-    #           panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
-    #           panel.background=element_blank(),
-    #           axis.line=element_line(colour="white"),
-    #           axis.text=element_text(size=12),
-    #           axis.text.x=element_text(size=12, angle=0),
-    #           axis.title.x=element_text(face="bold", size=12, angle=0),
-    #           axis.title.y=element_text(face="bold", size=12),
-    #           panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #
-    # pca_aa_2_3 <- ggplot() +
-    #     scale_fill_manual(values=aa_cols) +
-    #     geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.2, Dim.3, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) +
-    #     geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=3, alpha=1, fill="orange") +
-    #     #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3, label=ID), size=3, colour="orange") +
-    #     xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
-    #     ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
-    #     theme(legend.position="top", legend.title=element_blank(),
-    #           panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
-    #           panel.background=element_blank(),
-    #           axis.line=element_line(colour="white"),
-    #           axis.text=element_text(size=12),
-    #           axis.text.x=element_text(size=12, angle=0),
-    #           axis.title.x=element_text(face="bold", size=12, angle=0),
-    #           axis.title.y=element_text(face="bold", size=12),
-    #           panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
-    #if (saveFiles=="TRUE") {
-      #ggsave(paste0(newOut, "/pca_archetypes_pc2_3_", newID, "_", Sys.Date(), ".pdf"), plot=last_plot(), device="pdf", width=7, height=6)
-    #}
 
+    pred_aa <- data.frame(stats::predict(aa_model, new_scores[,colnames(aa_model$archetypes)]))
+    rownames(pred_aa) <- newID
+    pred_aa <- round(pred_aa * 100, 3)
+    
+    new_scores$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
+    new_scores$Dx <- "new"
+    new_scores$Dx_simple <- "new"
+    
+    mscores_aa_all <- rbind(dx_ref, new_scores[,colnames(dx_ref)])
+
+    pca.aa <- merge(pca.df, mscores_aa_all[,c("ID", "aa_cluster")], by="ID")
+    pca.aa$aa_cluster <- as.factor(pca.aa$aa_cluster)
+
+    pca.aa[pca.aa$ref=="new",]
+
+    aa_cols=c("black", "firebrick", "lightgray", "blue3", "#009E73")
+
+    pca_aa <- ggplot() +
+        scale_fill_manual(values=aa_cols) +
+        #geom_point(data=pca.aa, aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) +
+        geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.1, Dim.2, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) +
+        geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
+        #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=4, colour="orange") +
+        xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
+        ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
+        theme(legend.position="top", legend.title=element_blank(),
+              panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
+              panel.background=element_blank(),
+              axis.line=element_line(colour="white"),
+              axis.text=element_text(size=12),
+              axis.text.x=element_text(size=12, angle=0),
+              axis.title.x=element_text(face="bold", size=12, angle=0),
+              axis.title.y=element_text(face="bold", size=12),
+              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+
+    pca_aa_2_3 <- ggplot() +
+        scale_fill_manual(values=aa_cols) +
+        geom_point(data=pca.aa[pca.aa$ref=="ref",], aes(Dim.2, Dim.3, fill=aa_cluster), shape=21, color="gray", size=4, alpha=0.7) +
+        geom_point(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=3, alpha=1, fill="orange") +
+        #geom_text_repel(data=pca.aa[pca.aa$ref=="new",], aes(Dim.2, Dim.3, label=ID), size=3, colour="orange") +
+        xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
+        ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
+        theme(legend.position="top", legend.title=element_blank(),
+              panel.grid.minor=element_line(colour="gray"), panel.grid.major=element_blank(),
+              panel.background=element_blank(),
+              axis.line=element_line(colour="white"),
+              axis.text=element_text(size=12),
+              axis.text.x=element_text(size=12, angle=0),
+              axis.title.x=element_text(face="bold", size=12, angle=0),
+              axis.title.y=element_text(face="bold", size=12),
+              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
     ##---------------
     ## Dx by cluster
     ## banff score by cluster
@@ -1326,8 +1083,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     # aa.2.df <- droplevels(aa.df[aa.df$aa_cluster=="2",])
     # aa.3.df <- droplevels(aa.df[aa.df$aa_cluster=="3",])
     # aa.4.df <- droplevels(aa.df[aa.df$aa_cluster=="4",])
-    # aa.5.df <- droplevels(aa.df[aa.df$aa_cluster=="5",])
-    # aa.6.df <- droplevels(aa.df[aa.df$aa_cluster=="6",])
     #
     # ## Dx by cluster
     # k1.df <- data.frame(table(aa.1.df$Dx))
@@ -1346,29 +1101,21 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     # k4.df$k <- "4"
     # colnames(k4.df) <- c("Dx", "total", "cluster")
     #
-    # k5.df <- data.frame(k5=table(aa.5.df$Dx))
-    # k5.df$k <- "5"
-    # colnames(k5.df) <- c("Dx", "total", "cluster")
-    #
-    # k6.df <- data.frame(k6=table(aa.6.df$Dx))
-    # k6.df$k <- "6"
-    # colnames(k6.df) <- c("Dx", "total", "cluster")
-    #
     # ## Dx by cluster
-    # cluster_table <- dplyr::bind_rows(k1.df, k2.df, k3.df, k4.df, k5.df, k6.df)
+    # cluster_table <- dplyr::bind_rows(k1.df, k2.df, k3.df, k4.df)
     #write.table(cluster_table, file=paste0(newOut, "/aa_cluster_", newID, "_", Sys.Date(), ".txt"), row.names=F, quote=F, sep='\t')
 
     ##-------------------------------------------
     ## output files and plots for markdown report
-    return(list(score_table=mscores_new_pct,
+    return(list(new_scores=new_scores_pct,
               ref_scores=ref.score.quantiles,
               knn_dx=nn_dx,
               knn_banff=nn_banff,
               pca_1_2=pca_new_1_2,
               pca_2_3=pca_new_2_3,
+              aa_cluster_new=pred_aa, #new sample cluster probs
+              pca_archetype=pca_aa,
               #aa_cluster_table=cluster_table,
-              #aa_cluster_new=pred_aa, #new sample cluster probs
-              #pca_archetype=pca_aa,
               pathways=pathway_table,
               pathway_radar=pathway_radar,
               cell_types=cell_type_table,
@@ -1378,45 +1125,3 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
           )
 
 }
-
-##--------------------------
-## barplots of banff scores by cluster
-## k_df is a table with ID, aa_cluster, Dx + banff lesion scores
-plot_k <- function(k_df, cluster, index) {
-
-  df.tab <- mapply(table, k_df[,c("cg", "g", "ptc", "i", "t", "v", "ci", "ct", "cv", "ah")])
-
-  if (isTRUE(index)) {
-    ##index using largest vector as number of rows
-    df.banff <- data.frame(sapply(df.tab, '[', seq(max(lengths(df.tab)))))
-  } else {
-    df.banff <- df.tab
-  }
-
-  df.banff[is.na(df.banff)]=0
-
-  df.banff <- apply(df.banff, 2, function(x) {x/sum(x)*100}) ## % biopsies
-
-  suppressWarnings({
-    df.banff <- reshape2::melt(df.banff)
-  })
-  df.banff$Var1 <- as.factor(df.banff$Var1)
-  df.banff <- df.banff[order(df.banff$Var1, decreasing=TRUE),]
-  df.banff[is.na(df.banff)]=0
-  ## percent of patients (with a given banff score)
-  ggplot(data=df.banff) + ylab("% biopsies") + ggtitle(cluster) +
-    geom_bar(aes(x=Var2, y=value, fill=forcats::fct_rev(Var1)), color="black", stat="identity", alpha=1, width=0.9) +
-    scale_fill_manual("score", values = c("steelblue4", "steelblue3", "lightblue", "lightcyan")) +
-    theme(axis.title.x=element_blank())
-}
-
-# g1 <- plot_k(aa.1.df, "k=1", index=TRUE)
-# g2 <- plot_k(aa.2.df, "k=2", index=FALSE)
-# g3 <- plot_k(aa.3.df, "k=3", index=TRUE)
-# g4 <- plot_k(aa.4.df, "k=4", index=TRUE)
-# grid.arrange(g1, g2, g3, g4, ncol=2, nrow=2)
-
-## Optimal cluster # validation: silhouette index
-## https://towardsdatascience.com/silhouette-coefficient-validating-clustering-techniques-e976bb81d10c
-
-

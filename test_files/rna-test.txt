@@ -1,5 +1,6 @@
-Platform ID	test
-Center ID	test_123
-concentration	25 ng/ul
-260/280 ratio	1.9
-260/230 ratio	2
+platform_id	test
+center_id	test_123
+concentration	25
+concentration_units	ng/ul
+ratio_260_280	1.9
+ratio_260_230	2

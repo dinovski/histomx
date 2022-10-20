@@ -48,7 +48,7 @@ library(rjson)
 > **Team leader:** Pr Alexandre Loupy MD/PhD  
 **Project managers:** Fariza Mezine & Blaise Robin  
 **Bioinformatician:** Dina Zielinski PhD
-**Clinical reviewer:** Olivier Aubert MD/PhD  
+**Clinical reviewer:** Valentin Goutaudier MD  
 **Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85  
 > Inserm U970 - 56 rue Leblanc 75015 Paris, France
 
@@ -90,19 +90,25 @@ newQC <- rccQC(newRCC, outPath)
 
 if(!is.na(file.info(newPatient)$size)) {
   
-    jfile <- fromJSON(file=newPatient)
-    pt_df <- as.data.frame(jfile, check.names=F)
-
-    ## exclude empty cells
-    pt_df <- pt_df %>% filter_all(all_vars(!is.na(.)))
+	if (tools::file_ext(newPatient) == "json") {
+		jfile <- fromJSON(file=newPatient)
+		pt_df <- as.data.frame(jfile, check.names=F)
+	} else if (tools::file_ext(newPatient) == "txt") {
+		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"))
+	} else {
+		stop("Patient file must be a .json or tab delimited .txt file")
+	}	
+    
+	## exclude empty cells
+	pt_df <- pt_df %>% filter_all(all_vars(!is.na(.)))
       
 } else {
-    ## display empty data frame
-    pt_df <- data.frame('Platform ID'=newPreds$score_table$ID,
+	## display empty data frame
+	pt_df <- data.frame('Platform ID'=newPreds$score_table$ID,
                         'Date of transplantation'=" ", 'Date of biopsy'=" ",
                         'Biopsy indication'="    ", check.names=FALSE)
-    pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
-  }
+	pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
+}
 
 ## format and output patient info table
 if(nrow(pt_df) %% 2 == 0) {

@@ -1,6 +1,7 @@
+## THIS IS THE MASTER SCRIPT (~/Dropbox/PTG/transcriptomics/nanostring/scripts/BHOTR/scripts/)
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
@@ -27,58 +28,87 @@ geoMean <- function(x) {
 
 ##-------------------------------------------------
 ## output model performance metrics
-assessPrediction <- function(truth, predicted, print.results=TRUE) {
-    predicted = predicted[ ! is.na(truth) ]
-    truth = truth[ ! is.na(truth) ]
-    truth = truth[ ! is.na(predicted) ]
-    predicted = predicted[ ! is.na(predicted) ]
-    result = list()
-    result$accuracy = sum(truth==predicted)*100/length(truth)
-    if ( print.results ) {
-        cat("Total cases that are not NA: ",length(truth),"\n",sep="")
-        cat("Accuracy=TP+TN/total: ", sum(truth==predicted),
-            "(",signif(result$accuracy,3),"%)\n",sep="")
-    }
-    TP = sum(truth==1 & predicted==1)
-    TN = sum(truth==0 & predicted==0)
-    FP = sum(truth==0 & predicted==1)
-    FN = sum(truth==1 & predicted==0)
-    P = TP+FN ## total num positives
-    N = FP+TN # total num negatives
-    precision=TP/(TP+FP)
-    recall=TP/(TP+FN)
-    result$PPV = 100*TP/(TP+FP)
-    result$TPR = 100*TP/P
-    result$TNR = 100*TN/N
-    result$FDR = 100*FP/(TP+FP)
-    result$FPR = 100*FP/N
-    result$b_accuracy = (result$TPR + result$TNR)/2 #balanced accuracy
-    result$F1 = 2*((precision*recall)/(precision+recall))*100 #harmonic mean
-    if ( print.results ) {
-        cat("PPV: (precision)=TP/(TP+FP)= ", signif(result$PPV,3),"%\n",sep="")
-        cat("TPR: (sensitivity)=TP/(TP+FN)= ", signif(result$TPR,3),"%\n",sep="") ##recall
-        cat("TNR: (specificity)=TN/(TN+FP)= ", signif(result$TNR,3),"%\n",sep="")
-        cat("FDR: (false discovery)=1-PPV= ", signif(result$FDR,3),"%\n",sep="")
-        cat("FPR: FP/N=1-TNR= ", signif(result$FPR,3),"%\n",sep="")
-        cat("F1: 2(PPV*TPR)/(PPV+TPR)= ", signif(result$F1,3),"%\n",sep="")
-    }
-    if ( print.results ) { invisible(result) }
-    else { return(data.frame(result)) }
+modelEval <- function(true_values, predicted_values, threshold=NULL, print.results=TRUE) {
+	
+	predicted_values = predicted_values[ ! is.na(true_values) ]
+	true_values = true_values[ ! is.na(true_values) ]
+	true_values = true_values[ ! is.na(predicted_values) ]
+	predicted_values = predicted_values[ ! is.na(predicted_values) ]
+	
+	roc <- pROC::roc(true_values, predicted_values, quiet=TRUE)
+	
+	result = list()
+	result$AUC <- round(100*as.numeric(ci(roc, of="auc"))[2], 3)
+	result$brier_score <-round(100*DescTools::BrierScore(true_values, predicted_values), 3)
+	result$log_loss <- round(MLmetrics::LogLoss(true_values, predicted_values), 3)
+	
+	pred_tab <- data.frame(truth=true_values, predicted=predicted_values)
+	result$PRAUC <- round(100*PRROC::pr.curve(pred_tab[pred_tab$truth==1,"predicted"], pred_tab[pred_tab$truth==0,"predicted"], curve=TRUE)$auc.integral, 3)
+	
+	
+	if (exists('threshold')) {
+		predicted_outcomes <- ifelse(predicted_values > threshold, 1, 0)
+		result$youden <- threshold
+	} else {
+		roc_coords <- coords(roc, x="best", input="threshold", best.method="youden", transpose=F)
+		predicted_outcomes <- ifelse(predicted_values > roc_coords$threshold, 1, 0)
+		result$youden <- round(roc_coords$threshold, 3)	
+	}
+
+	result$CI_low <- round(100*as.numeric(ci(roc, of="auc"))[1], 3)
+	result$CI_high <- round(100*as.numeric(ci(roc, of="auc"))[3], 3)
+	result$accuracy = sum(true_values==predicted_outcomes)*100/length(true_values)
+	
+	if ( print.results ) {
+		cat("Total cases that are not NA: ",length(true_values),"\n",sep="")
+		cat("Accuracy=TP+TN/total: ", sum(true_values==predicted_outcomes),
+		    "(",signif(result$accuracy,3),"%)\n",sep="")
+	}
+	
+	TP = sum(true_values==1 & predicted_outcomes==1)
+	TN = sum(true_values==0 & predicted_outcomes==0)
+	FP = sum(true_values==0 & predicted_outcomes==1)
+	FN = sum(true_values==1 & predicted_outcomes==0)
+	P = TP+FN
+	N = FP+TN
+	precision=TP/(TP+FP)
+	recall=TP/(TP+FN)
+	result$PPV = 100*TP/(TP+FP)
+	result$TPR = 100*TP/P
+	result$TNR = 100*TN/N
+	result$FDR = 100*FP/(TP+FP)
+	result$FPR = 100*FP/N
+	result$balanced_accuracy = (result$TPR + result$TNR)/2 #balanced accuracy
+	result$F1 = 2*((precision*recall)/(precision+recall))*100 #harmonic mean
+	
+	if ( print.results ) {
+		cat("PPV: (precision)=TP/(TP+FP)= ", signif(result$PPV,3),"%\n",sep="")
+		cat("TPR: (sensitivity)=TP/(TP+FN)= ", signif(result$TPR,3),"%\n",sep="")
+		cat("TNR: (specificity)=TN/(TN+FP)= ", signif(result$TNR,3),"%\n",sep="")
+		cat("FDR: (false discovery)=1-PPV= ", signif(result$FDR,3),"%\n",sep="")
+		cat("FPR: FP/N=1-TNR= ", signif(result$FPR,3),"%\n",sep="")
+		cat("F1: 2(PPV*TPR)/(PPV+TPR)= ", signif(result$F1,3),"%\n",sep="")
+	}
+	#if ( print.results ) { invisible(result) }
+	#else { return(data.frame(result)) }
+	
+	return(data.frame(result))
 }
 
 ##-------------------------------------------------
 ## plot score cutoff versus TPR, TNR, Accuracy, F1
 plotPrediction <- function(truth, predicted, threshold) {
-    cutoffs <- data.frame(matrix(nrow=length(seq(0,1, 0.1)), ncol=5))
+    
+    cutoffs <- data.frame(matrix(nrow=length(seq(0.1,1, 0.1)), ncol=5))
     colnames(cutoffs) <- c("cutoff", "TPR", "TNR", "Accuracy", "F1")
-    cutoffs$cutoff <- seq(0,1, 0.1)
+    cutoffs$cutoff <- seq(0.1,1, 0.1)
     
     for (i in 1:nrow(cutoffs)) {
         cutpoint <- cutoffs$cutoff[i]
-        cutoffs[i,2] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[3]/100
-        cutoffs[i,3] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[4]/100
-        cutoffs[i,4] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[1]/100
-        cutoffs[i,5] <-t(assessPrediction(truth, ifelse(predicted>cutpoint, "1", "0"), print.results=F))[7]/100
+        cutoffs[i,"TPR"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$TPR
+        cutoffs[i,"TNR"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$TNR
+        cutoffs[i,"Accuracy"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$accuracy
+        cutoffs[i,"F1"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$F1
     }
     
     plot(cutoffs$cutoff, cutoffs$TPR, col="blue", type="l", lty=4, lwd=2, xlab="score cutoff", ylab="")
@@ -94,48 +124,50 @@ plotPrediction <- function(truth, predicted, threshold) {
 ## parse a single RCC file
 importRCC <- function(rccFile) {
     
-    rccFile <- readLines(rccFile)
-    rccFile <- trimws(rccFile, which="both") #remove leading/trailing whitespace
-    rccFile <- data.frame(line = rccFile, tag = rep("", length(rccFile)), stringsAsFactors = FALSE)
+	file_name <- basename(rccFile)	
+	rccFile <- readLines(rccFile)
+	rccFile <- trimws(rccFile, which="both") #remove leading/trailing whitespace
+	rccFile <- data.frame(line = rccFile, tag = rep("", length(rccFile)), stringsAsFactors = FALSE)
+	
+	## lane attributes contain Fov, BD
+	tags <- c("Header", "Sample_Attributes", "Lane_Attributes", "Code_Summary", "Messages")
 
-    ## lane attributes contain Fov, BD
-    tags <- c("Header", "Sample_Attributes", "Lane_Attributes", "Code_Summary", "Messages")
+	## assign tag to each line
+	for (i in 1:length(tags)) {
+        	tag_start <- which(rccFile$line == paste0("<", tags[i], ">"))
+        	tag_end <- which(rccFile$line == paste0("</", tags[i], ">"))
+        	rccFile$tag[tag_start:tag_end] <- tags[i]
+	}
 
-    ## assign tag to each line
-    for (i in 1:length(tags)) {
-        tag_start <- which(rccFile$line == paste0("<", tags[i], ">"))
-        tag_end <- which(rccFile$line == paste0("</", tags[i], ">"))
-        rccFile$tag[tag_start:tag_end] <- tags[i]
-    }
+	rccFile <- rccFile[rccFile$tag != "",] ## exclude lines with empty tags
+	rccFile <- rccFile[!grepl("<", rccFile$line),] ## remove lines with tag names start
+	rccFile <- rccFile[!grepl("</", rccFile$line),] ## remove linear with tag names end
 
-    rccFile <- rccFile[rccFile$tag != "",] ## exclude lines with empty tags
-    rccFile <- rccFile[!grepl("<", rccFile$line),] ## remove lines with tag names start
-    rccFile <- rccFile[!grepl("</", rccFile$line),] ## remove linear with tag names end
+	## get sample ID
+	samp_attr <- rccFile[rccFile$tag=="Sample_Attributes",]
+	id_line <- samp_attr[grep("^ID", samp_attr$line),]
+	sampID <- do.call('rbind', strsplit(as.character(id_line$line), ','))[2]
 
-    ## get sample ID
-    samp_attr <- rccFile[rccFile$tag=="Sample_Attributes",]
-    id_line <- samp_attr[grep("^ID", samp_attr$line),]
-    sampID <- do.call('rbind', strsplit(as.character(id_line$line), ','))[2]
+	all_attr <- rccFile[rccFile$tag!="Code_Summary",]
 
-    all_attr <- rccFile[rccFile$tag!="Code_Summary",]
+	parse_attr <- data.frame(do.call('rbind', strsplit(as.character(all_attr$line), ',')), stringsAsFactors=FALSE)
+	parse_attr <- rbind(parse_attr, data.frame(X1="FileName", X2=file_name))
+	colnames(parse_attr) <- c("variable", sampID)
 
-    parse_attr <- data.frame(do.call('rbind', strsplit(as.character(all_attr$line), ',')), stringsAsFactors=FALSE)
-    colnames(parse_attr) <- c("variable", sampID)
-
-    ID_lnum <- grep("^ID", parse_attr[,1])
-    parse_attr[,1][ID_lnum] <- c("sampID", "laneID")
-
-    ## get raw counts: split columns and remove header row
-    parse_counts <- rccFile[rccFile$tag=="Code_Summary",]
-    parse_counts <- data.frame(do.call('rbind', strsplit(as.character(parse_counts$line), ',', fixed=TRUE)), stringsAsFactors=FALSE)
-    parse_counts <- parse_counts[grep("^Code", parse_counts[,1], invert=TRUE),]
-    colnames(parse_counts) <- c("CodeClass", "Name", "Accession", sampID)
-    parse_counts[,sampID] <- sapply(parse_counts[,sampID], as.numeric)
+	ID_lnum <- grep("^ID", parse_attr[,1])
+	parse_attr[,1][ID_lnum] <- c("sampID", "laneID")
+	
+	## get raw counts: split columns and remove header row
+	parse_counts <- rccFile[rccFile$tag=="Code_Summary",]
+	parse_counts <- data.frame(do.call('rbind', strsplit(as.character(parse_counts$line), ',', fixed=TRUE)), stringsAsFactors=FALSE)
+	parse_counts <- parse_counts[grep("^Code", parse_counts[,1], invert=TRUE),]
+	colnames(parse_counts) <- c("CodeClass", "Name", "Accession", sampID)
+	parse_counts[,sampID] <- sapply(parse_counts[,sampID], as.numeric)
     
-    ## return a nested list of raw counts and sample attributes
-    rcc_summary <- list(counts=parse_counts, 
+	## return a nested list of raw counts and sample attributes
+	rcc_summary <- list(counts=parse_counts, 
                         attributes=parse_attr)
-    return(rcc_summary)
+	return(rcc_summary)
 }
 
 ## call importRCC function to import and parse data, combine all into count table and attribute table
@@ -158,6 +190,9 @@ parseRCC <- function(rccFiles) {
     cat('\n');
     cat("Successfully imported data for", tot_rcc, "sample(s)", '\n');
     cat(nrow(countTable[countTable$CodeClass=="Endogenous",]), "endogenous genes", '\n');
+    cat(nrow(countTable[countTable$CodeClass=="Housekeeping",]), "housekeeping genes", '\n');
+    cat(nrow(countTable[countTable$CodeClass=="Positive",]), "positive genes", '\n');
+    cat(nrow(countTable[countTable$CodeClass=="Negative",]), "negative genes", '\n');
     cat('----------------------------------\n');
     
     return(list(counts=countTable,
@@ -174,7 +209,7 @@ qcAttributes <- function(attributes_table) {
     pct_fov <- round(as.numeric(qcTab[qcTab$variable=="FovCounted",][-1]) / as.numeric(qcTab[qcTab$variable=="FovCount",][-1]), 4)*100
     qcTab <- rbind(qcTab, c("pct_fov", pct_fov))
     
-    qcTab <- setNames(data.frame(t(qcTab[,-1])), qcTab[,1])
+    qcTab <- setNames(data.frame(t(qcTab[,-1]), check.names=FALSE), qcTab[,1])
     qcTab$ID <- rownames(qcTab)
     rownames(qcTab) <- NULL
     
@@ -218,189 +253,205 @@ qcAttributes <- function(attributes_table) {
 
 ##------------------------------
 ## Control probe quality control checks; multiple samples
-## input: rows= genes, cols=CodeClass, Name, Accession, samples...
+## input: rows=genes, cols=CodeClass, Name, Accession, samples...
 qcCounts <- function(count_table) {
-    
-    cat('---------------------------\n');
-    cat('| Per sample control gene QC |\n');
-    cat('---------------------------\n');
-    
-    samp_ids <- colnames(count_table[,!colnames(count_table) %in% c("CodeClass", "Name", "Accession")])
-    endo_tab <- count_table[count_table$CodeClass=="Endogenous",c("Name", samp_ids)]
-    hk_tab <- count_table[count_table$CodeClass=="Housekeeping",c("Name", samp_ids)]
-    rownames(count_table) <- count_table$Name
-
-    cat('\nOverall Assay Efficiency:\n')
-    cat("(geometric mean of positive controls > 3 SD of the geometric mean of endogenous genes)\n")
-    
-    geo_means <- data.frame(ID=samp_ids, stringsAsFactors=FALSE)
-    geo_means$endo_geo_mean <- rep("NA", nrow(geo_means))
-    geo_means$hk_geo_mean <- rep("NA", nrow(geo_means))
-    geo_means$pos_geo_mean <- rep("NA", nrow(geo_means))
-    geo_means$neg_geo_mean <- rep("NA", nrow(geo_means))
-
-    for (i in 1:length(samp_ids) ) {
-        sampID <- samp_ids[i]
-        endo_counts <- count_table[count_table$CodeClass=="Endogenous",][sampID][,1]
-        hk_counts <- count_table[count_table$CodeClass=="Housekeeping",][sampID][,1]
-        pos_counts <- count_table[count_table$CodeClass=="Positive",][sampID][,1]
-        neg_counts <- count_table[count_table$CodeClass=="Negative",][sampID][,1]
-        
-        ## add values to table
-        geo_means[geo_means$ID==sampID,"endo_geo_mean"] <- round(geoMean(endo_counts), 3) # geometric mean of endogenous genes
-        geo_means[geo_means$ID==sampID,"hk_geo_mean"] <- round(geoMean(hk_counts), 3) # geometric mean of HK genes
-        geo_means[geo_means$ID==sampID,"pos_geo_mean"] <- round(geoMean(pos_counts), 3) # geometric mean of positive controls
-        geo_means[geo_means$ID==sampID,"neg_geo_mean"] <- round(geoMean(neg_counts), 3) # geometric mean of negative controls
-    }
-    
-    if (any(geo_means$pos_mean < geo_means$sd3)) {
-        cat("Assay Efficiency is low for the following samples:\n");
-        cat(geo_means[which(geo_means$pos_mean < geo_means$endo_sd3),"ID"], sep="\n")
-    } else {
-        cat(">>Assay Efficiency is OK for all samples\n");
-    }
-    
-    cat('----------------------------------\n',
-        'Positive Control Linearity:\n',
-        '(correlation between the observed counts and concentrations of Positive ERCC probes)\n')
-    ## Very low assay efficiency: If the counts of all the positive controls are very low (less than ~500 even for POS_A)
-    
-    pos_tab <- count_table[count_table$CodeClass=="Positive",c("Name", samp_ids)]
-    
-    ## POS_F is considered below the limit of detection: remove when calculating linearity
-    ## POS_F counts are significantly higher than the negative control counts in most cases
-    pos_tab <- pos_tab[grep("POS_F", pos_tab$Name, invert=TRUE),]
-    
-    if (!all(grepl("[[:digit:]]", pos_tab$Name))) {
-        stop("Positive controls must include concentrations in their names, eg. POS_A(128)")
-    }
-    
-    ## extract positive control concentration
-    pos_tab$concentration <- as.numeric(gsub(".*\\((.*)\\).*", "\\1", pos_tab$Name))
-    
-    ## calculate positive control linearity for each sample
-    positiveLinearityQC <- apply(pos_tab[,samp_ids], 2, function(x) {
-        round(summary(lm(x ~ pos_tab$concentration))$r.squared, 3)
-    })
-    
-    if (any(positiveLinearityQC < 0.95)) {
-        cat(">>Linearity performance is low (<0.95) for the following sample(s):\n",
-            names(which(positiveLinearityQC < 0.95)))
-    } else {
-        cat("\n>>Positive control linearity [lm(counts ~ concentration)] is > 0.95 for all samples\n")
-    }
-    
-    ## add positive control linearity to geo means table
-    pcl_tab <- data.frame(PCL=positiveLinearityQC)
-    pcl_tab$ID <- rownames(pcl_tab)
-    
-    ## plot positive control counts v. concentration
-    tab <- pos_tab
-    
-    ## supress data table warning message
-    suppressWarnings({
-    tab <- data.table::melt(tab, measure.vars=samp_ids, verbose=FALSE)
-    colnames(tab) <- c("Name", "concentration", "ID", "count")
-    })
-    
-    linearity_plot <- ggplot(tab, aes(x=concentration, y=count, group=ID, color=ID)) +
-        geom_point(shape = 21, size=3) + 
-        xlab("raw counts") + ylab("concentration (fM)") +
-        geom_text_repel(data=tab, aes(x=concentration, y=count, label=Name), size=4, colour="darkgray") +
-        geom_smooth(aes(fill=ID), method = "lm", fullrange=TRUE, se=TRUE, size=1, 
-                    color="slategray", formula = y ~ x, linetype="dashed")
-    
-    cat('\n----------------------------------\n',
-        'Positive Control Limit of Detection:\n',
-        '(POS_E control probe counts > mean negative control + 2*SD)\n')
-    
-    pos_e = count_table[grep("POS_E", count_table$Name),]
-    neg_raw <- count_table[count_table$CodeClass=="Negative",]
-    
-    ncgMean = apply(neg_raw[,samp_ids], 2, mean)
-    ncgSD = apply(neg_raw[,samp_ids], 2, sd)
-    lod = ncgMean + 2*ncgSD
-    pos_e_counts = pos_e[,samp_ids]
-    
-    ## POS_E counts should be > lod
-    if (any(pos_e_counts < lod)) {
-        cat(">>Postive control limit of detection is low for the following sample(s):\n",
-            names(pos_e_counts[which(pos_e_counts < lod)]), '\n')
-    } else {
-        cat(">>Positive control E counts are > LoD for all samples\n")
-    }
-    
-    ## % endogenous (n=758) and housekeeping (n=12) genes above LoD per sample
-    pctLOD <- data.frame(ID=names(lod), LOD=lod)
-    pctLOD$pct_endo_alod <- rep(NA, nrow(pctLOD)) #percent endo genes above LoD
-    pctLOD$pct_hk_alod <- rep(NA, nrow(pctLOD)) #percent HK genes above LoD
-    pctLOD$num_hk_alod <- rep(NA, nrow(pctLOD)) #tot HK genes above LoD
-    
-    for (i in 1:length(samp_ids)) {
-    	
-    	idx <- samp_ids[i]
-    	i_lod <- pctLOD[idx,"LOD"]
-    	
-    	# percent endogenous genes > LoD
-        endo_counts <- endo_tab[,idx]
-        pctLOD[idx,"pct_endo_alod"] <- round(length(endo_counts[which(endo_counts > i_lod)]) / length(endo_counts) * 100, 3)
-        
-        # percent housekeeping genes > LoD
-        hk_counts <- hk_tab[,idx]
-        pctLOD[idx,"num_hk_alod"] <- round(length(hk_counts[which(hk_counts > i_lod)]), 3)
-        pctLOD[idx,"pct_hk_alod"] <- round(pctLOD[idx,"num_hk_alod"] / length(hk_counts) * 100, 3)
-        
-    }
-    
-    ## combine stats
-    out_tab <- merge(geo_means, pctLOD, by="ID")
-    out_tab <- merge(out_tab, pcl_tab, by="ID")
-    
-    cat('----------------------------------\n',
-        'Limit of Detection Flag:\n',
-        '(Sample(s) with >1 housekeeping gene below the LOD and high % of endogenous genes < LOD (lod_flag))\n');
-    
-    ## flag samples with >1 HK gene below LoD AND %endo_genes<LOD greater than the top quartile of the distribution of %endo_genes<LoD in samples with all HK genes above LoD
-    ref_blod <- quantile(100 - out_tab[out_tab$num_hk_alod==12,"pct_endo_alod"], 0.75) #samps w/ all HK genes > LoD
-    out_tab$pct_endo_blod <- 100 - out_tab$pct_endo_alod # %endogenous genes < LoD for non-ref samples
-    out_tab$lod_flag <- ifelse(out_tab$pct_endo_blod > ref_blod & out_tab$num_hk_alod<11, 1, 0)
-    
-    if (any(out_tab$lod_flag==1)) {
-    	cat(">>Sample(s) with LOD flag:\n",
-    	    out_tab[out_tab$lod_flag==1,"ID"], '\n')
-    } else {
-    	cat(">>No samples flagged for LOD QC\n")
-    }
-    cat('----------------------------------\n');
-    
-    cat('----------------------------------\n',
-        'RNA content Flag:\n',
-        '(HK gene raw counts v. the n [n=length(HKgenes)] most highly expressed endogenous genes per sample)\n');
-    out_tab$rna_content_r2 <- NA
-    for (i in 1:nrow(out_tab)) {
-    	i_id <- out_tab[i,"ID"]
-    	i_endo <- count_table[count_table$CodeClass=="Endogenous",i_id]
-    	i_hk <- count_table[count_table$CodeClass=="Housekeeping",i_id]
-    	raw_counts <- data.frame(endo=i_endo[order(i_endo, decreasing=TRUE)][1:length(i_hk)], hk=i_hk[order(i_hk, decreasing=TRUE)])
-    	corr = round(summary(lm(raw_counts$endo ~ raw_counts$hk))$r.squared, 3)
-    	out_tab[i,"rna_content_r2"] <- corr
-    }
-    rna_threshold = mean(out_tab$rna_content_r2) - 3*sd(out_tab$rna_content_r2)
-    if (any(out_tab$rna_content_r2 < rna_threshold)) {
-    	cat(">>Sample(s) with RNA content flag:\n",
-    	    out_tab[out_tab$rna_content_r2 < rna_threshold,"ID"], '\n')
-    	out_tab$rna_content_flag <- ifelse(out_tab$rna_content_r2 < rna_threshold, 1, 0)
-    } else {
-    	cat(">>No samples flagged for RNA content\n")
-    }
-    cat('----------------------------------\n');
-    
-    #out_tab$pcl_flag <- ifelse(out_tab$PCL < 0.95, 1, 0)
-
-    return(list(qc_table=out_tab,
-                pos_control_counts=pos_tab,
-                linearity_plot=linearity_plot))
-    
+	
+	cat('---------------------------\n');
+	cat('| Per sample control gene QC |\n');
+	cat('---------------------------\n');
+	
+	samp_ids <- colnames(count_table[,!colnames(count_table) %in% c("CodeClass", "Name", "Accession")])
+	endo_tab <- count_table[count_table$CodeClass=="Endogenous",c("Name", samp_ids)]
+	hk_tab <- count_table[count_table$CodeClass=="Housekeeping",c("Name", samp_ids)]
+	rownames(count_table) <- count_table$Name
+	
+	cat('\nOverall Assay Efficiency:\n')
+	cat("(geometric mean of positive controls > 3 SD of the geometric mean of endogenous genes)\n")
+	
+	geo_means <- data.frame(ID=samp_ids, stringsAsFactors=FALSE)
+	geo_means$endo_geo_mean <- rep("NA", nrow(geo_means))
+	geo_means$hk_geo_mean <- rep("NA", nrow(geo_means))
+	geo_means$pos_geo_mean <- rep("NA", nrow(geo_means))
+	geo_means$neg_geo_mean <- rep("NA", nrow(geo_means))
+	
+	for (i in 1:length(samp_ids) ) {
+		sampID <- samp_ids[i]
+		endo_counts <- count_table[count_table$CodeClass=="Endogenous",][sampID][,1]
+		hk_counts <- count_table[count_table$CodeClass=="Housekeeping",][sampID][,1]
+		pos_counts <- count_table[count_table$CodeClass=="Positive",][sampID][,1]
+		neg_counts <- count_table[count_table$CodeClass=="Negative",][sampID][,1]
+		
+		## add values to table
+		geo_means[geo_means$ID==sampID,"endo_geo_mean"] <- round(geoMean(endo_counts), 3) # geometric mean of endogenous genes
+		geo_means[geo_means$ID==sampID,"hk_geo_mean"] <- round(geoMean(hk_counts), 3) # geometric mean of HK genes
+		geo_means[geo_means$ID==sampID,"pos_geo_mean"] <- round(geoMean(pos_counts), 3) # geometric mean of positive controls
+		geo_means[geo_means$ID==sampID,"neg_geo_mean"] <- round(geoMean(neg_counts), 3) # geometric mean of negative controls
+	}
+	
+	if (any(geo_means$pos_mean < geo_means$sd3)) {
+		cat("Assay Efficiency is low for the following samples:\n");
+		cat(geo_means[which(geo_means$pos_mean < geo_means$endo_sd3),"ID"], sep="\n")
+	} else {
+		cat(">>Assay Efficiency is OK for all samples\n");
+	}
+	
+	cat('----------------------------------\n',
+	    'Positive Control Linearity:\n',
+	    '(correlation between the observed counts and concentrations of Positive ERCC probes)\n')
+	
+	## Very low assay efficiency: If the counts of all the positive controls are very low (less than ~500 even for POS_A)
+	#pos_tab[pos_tab[1,]<500]
+	
+	pos_tab <- count_table[count_table$CodeClass=="Positive",c("Name", samp_ids)]
+	
+	## POS_F is considered below the limit of detection: remove when calculating linearity
+	## POS_F counts are significantly higher than the negative control counts in most cases
+	pos_tab <- pos_tab[grep("POS_F", pos_tab$Name, invert=TRUE),]
+	
+	if (!all(grepl("[[:digit:]]", pos_tab$Name))) {
+		stop("Positive controls must include concentrations in their names, eg. POS_A(128)")
+	}
+	
+	## Positive normalization factors: arithmetic mean of the geometric means of positive controls
+	posTab <- data.frame(t(pos_tab[,!colnames(pos_tab) %in% "Name"]))
+	posTab <- apply(posTab, MARGIN=1, FUN=geoMean);
+	pos_norm_factors <- data.frame(ID=names(posTab), pos_norm_factor=mean(posTab) / posTab)
+	pos_norm_factors$pos_norm_factor <- round(pos_norm_factors$pos_norm_factor, 2)
+	rownames(pos_norm_factors) <- NULL
+	
+	if ( any(pos_norm_factors$pos_norm_factor < 0.3) | any(pos_norm_factors$pos_norm_factor > 3) ) {
+		cat(">>Positive normalization factors out of range (<0.3 or >3):\n");
+		print.data.frame(pos_norm_factors[pos_norm_factors$pos_norm_factor<0.3 | pos_norm_factors$pos_norm_factor>3,])
+	}
+	
+	## extract positive control concentration
+	pos_tab$concentration <- as.numeric(gsub(".*\\((.*)\\).*", "\\1", pos_tab$Name))
+	
+	## calculate positive control linearity for each sample
+	positiveLinearityQC <- apply(pos_tab[,samp_ids], 2, function(x) {
+		round(summary(lm(x ~ pos_tab$concentration))$r.squared, 3)
+	})
+	
+	if (any(positiveLinearityQC < 0.95)) {
+		cat(">>Linearity performance is low (<0.95) for the following sample(s):\n",
+		    names(which(positiveLinearityQC < 0.95)))
+	} else {
+		cat("\n>>Positive control linearity [lm(counts ~ concentration)] is > 0.95 for all samples\n")
+	}
+	
+	## add positive control linearity to geo means table
+	pcl_tab <- data.frame(PCL=positiveLinearityQC)
+	pcl_tab$ID <- rownames(pcl_tab)
+	
+	## plot positive control counts v. concentration
+	tab <- pos_tab
+	
+	## supress data table warning message
+	suppressWarnings({
+		tab <- data.table::melt(tab, measure.vars=samp_ids, verbose=FALSE)
+		colnames(tab) <- c("Name", "concentration", "ID", "count")
+	})
+	
+	linearity_plot <- ggplot(tab, aes(x=concentration, y=count, group=ID, color=ID)) +
+		geom_point(shape = 21, size=3) + 
+		xlab("raw counts") + ylab("concentration (fM)") +
+		geom_text_repel(data=tab, aes(x=concentration, y=count, label=Name), size=4, colour="darkgray") +
+		geom_smooth(aes(fill=ID), method = "lm", fullrange=TRUE, se=TRUE, size=1, 
+			    color="slategray", formula = y ~ x, linetype="dashed")
+	
+	cat('\n----------------------------------\n',
+	    'Positive Control Limit of Detection:\n',
+	    '(POS_E control probe counts > mean negative control + 2*SD)\n')
+	
+	pos_e = count_table[grep("POS_E", count_table$Name),]
+	neg_raw <- count_table[count_table$CodeClass=="Negative",]
+	
+	ncgMean = apply(neg_raw[,samp_ids], 2, mean)
+	ncgSD = apply(neg_raw[,samp_ids], 2, sd)
+	lod = ncgMean + 2*ncgSD
+	pos_e_counts = pos_e[,samp_ids]
+	
+	## POS_E counts should be > lod
+	if (any(pos_e_counts < lod)) {
+		cat(">>Postive control limit of detection is low for the following sample(s):\n",
+		    names(pos_e_counts[which(pos_e_counts < lod)]), '\n')
+	} else {
+		cat(">>Positive control E counts are > LoD for all samples\n")
+	}
+	
+	## % endogenous (n=758) and housekeeping (n=12) genes above LoD per sample
+	pctLOD <- data.frame(ID=names(lod), LOD=lod)
+	pctLOD$pct_endo_alod <- rep(NA, nrow(pctLOD)) #percent endo genes above LoD
+	pctLOD$pct_hk_alod <- rep(NA, nrow(pctLOD)) #percent HK genes above LoD
+	pctLOD$num_hk_alod <- rep(NA, nrow(pctLOD)) #tot HK genes above LoD
+	
+	for (i in 1:length(samp_ids)) {
+		
+		idx <- samp_ids[i]
+		i_lod <- pctLOD[idx,"LOD"]
+		
+		# percent endogenous genes > LoD
+		endo_counts <- endo_tab[,idx]
+		pctLOD[idx,"pct_endo_alod"] <- round(length(endo_counts[which(endo_counts > i_lod)]) / length(endo_counts) * 100, 3)
+		
+		# percent housekeeping genes > LoD
+		hk_counts <- hk_tab[,idx]
+		pctLOD[idx,"num_hk_alod"] <- round(length(hk_counts[which(hk_counts > i_lod)]), 3)
+		pctLOD[idx,"pct_hk_alod"] <- round(pctLOD[idx,"num_hk_alod"] / length(hk_counts) * 100, 3)
+		
+	}
+	
+	## combine stats
+	out_tab <- merge(geo_means, pctLOD, by="ID")
+	out_tab <- merge(out_tab, pcl_tab, by="ID")
+	out_tab <- merge(out_tab, pos_norm_factors, by="ID")
+	
+	cat('----------------------------------\n',
+	    'Limit of Detection Flag:\n',
+	    '(Sample(s) with >1 housekeeping gene below the LOD and high % of endogenous genes < LOD (lod_flag))\n');
+	
+	## flag samples with >1 HK gene below LoD AND %endo_genes<LOD greater than the top quartile of the distribution of %endo_genes<LoD in samples with all HK genes above LoD
+	ref_blod <- quantile(100 - out_tab[out_tab$num_hk_alod==12,"pct_endo_alod"], 0.75) #samps w/ all HK genes > LoD
+	out_tab$pct_endo_blod <- 100 - out_tab$pct_endo_alod # %endogenous genes < LoD for non-ref samples
+	out_tab$lod_flag <- ifelse(out_tab$pct_endo_blod > ref_blod & out_tab$num_hk_alod<11, 1, 0)
+	
+	if (any(out_tab$lod_flag==1)) {
+		cat(">>Sample(s) with LOD flag:\n",
+		    out_tab[out_tab$lod_flag==1,"ID"], '\n')
+	} else {
+		cat(">>No samples flagged for LOD QC\n")
+	}
+	cat('----------------------------------\n');
+	
+	cat('----------------------------------\n',
+	    'RNA content Flag:\n',
+	    '(HK gene raw counts v. the n [n=length(HKgenes)] most highly expressed endogenous genes per sample)\n');
+	
+	out_tab$rna_content_r2 <- NA
+	for (i in 1:nrow(out_tab)) {
+		i_id <- out_tab[i,"ID"]
+		i_endo <- count_table[count_table$CodeClass=="Endogenous",i_id]
+		i_hk <- count_table[count_table$CodeClass=="Housekeeping",i_id]
+		raw_counts <- data.frame(endo=i_endo[order(i_endo, decreasing=TRUE)][1:length(i_hk)], hk=i_hk[order(i_hk, decreasing=TRUE)])
+		corr = round(summary(lm(raw_counts$endo ~ raw_counts$hk))$r.squared, 3)
+		out_tab[i,"rna_content_r2"] <- corr
+	}
+	rna_threshold = mean(out_tab$rna_content_r2) - 3*sd(out_tab$rna_content_r2)
+	if (any(out_tab$rna_content_r2 < rna_threshold)) {
+		cat(">>Sample(s) with RNA content flag:\n",
+		    out_tab[out_tab$rna_content_r2 < rna_threshold,"ID"], '\n')
+		out_tab$rna_content_flag <- ifelse(out_tab$rna_content_r2 < rna_threshold, 1, 0)
+	} else {
+		cat(">>No samples flagged for RNA content\n")
+	}
+	cat('----------------------------------\n');
+	
+	#out_tab$pcl_flag <- ifelse(out_tab$PCL < 0.95, 1, 0)
+	
+	return(list(qc_table=out_tab,
+		    pos_control_counts=pos_tab,
+		    linearity_plot=linearity_plot))
+	
 }
 
 ##------------------------------
@@ -448,7 +499,7 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
     #endo_genes <- gene_annotations[gene_annotations$CodeClass=="Endogenous","Name"]
     #endo_counts <- as.matrix(raw_counts[,colnames(raw_counts) %in% endo_genes])
     
-    ## HK genes below limit of detection > return percent of samples in which HK genes is < LOD
+    ## HK genes below limit of detection: return percent of samples in which HK genes is < LOD
     ncgMean = apply(ncg_counts, 1, mean)
     ncgSD = apply(ncg_counts, 1, sd)
     lod = ncgMean + 2*ncgSD
@@ -466,6 +517,7 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
     	df<-data.frame(hk_tab[i,-1] < hk_tab[i,"lod"])
     	hk_blod <- append(hk_blod, colnames(df)[df[1,]==TRUE])
     }
+    
     hk_blod_df <- data.frame(table(hk_blod))
     hk_blod_df <- hk_blod_df[order(hk_blod_df$Freq, decreasing=TRUE),]
     hk_blod_df$pct <- round(hk_blod_df$Freq / nrow(hk_tab) * 100, 3)
@@ -873,7 +925,7 @@ rccQC <- function(RCCfile, outPath) {
     attTable <- ns.data$attributes
     rownames(attTable) <- attTable$variable
     attTable$variable <- NULL
-    attTable <- data.frame(t(attTable))
+    attTable <- data.frame(t(attTable), check.names=FALSE)
     sampID <- attTable$sampID
     
     newOut <- paste0(outPath, sampID, "/")
@@ -945,7 +997,7 @@ rccQC <- function(RCCfile, outPath) {
                     "PCL")
     ## round all numeric values to 2 decimal points
     outTable[vars_to_round] <- format(round(outTable[vars_to_round], 2), nsmall = 2)
-    outTable <- data.frame(t(outTable))
+    outTable <- data.frame(t(outTable), check.names=FALSE)
     
     #write.table(outTable, quote=FALSE, sep='\t', row.names=TRUE,
     #           file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"))
@@ -961,20 +1013,38 @@ rccQC <- function(RCCfile, outPath) {
 ## Differential expression analysis for comparisons of interest
 
 ## DESEq2
-runDESeq <- function(raw_counts, col_data, exp_design) {
-    
-    deseq.res <- DESeqDataSetFromMatrix(countData = raw_counts, 
-                                        colData = col_data, 
-                                        design = formula(exp_design))
-    deseq.res <- DESeq(deseq.res, test="Wald")
-    deseq.res.sig <- results(deseq.res, pAdjustMethod="BH", tidy=TRUE)
-    deseq.res.sig <- deseq.res.sig[order(deseq.res.sig$pvalue, decreasing=FALSE),]
-    rownames(deseq.res.sig) <- deseq.res.sig$row
-    hist(deseq.res.sig$pvalue, main="")
-    
-    return(deseq.res.sig)
-    
+runDESeq <- function(raw_counts, col_data, exp_design, contrast_vector=NULL, coef_name=NULL, pAdjustMethod="BH", verbose=FALSE) {
+	
+	deseq.res <- DESeqDataSetFromMatrix(countData = raw_counts, 
+					    colData = col_data, 
+					    design = formula(exp_design))
+	# Wald Test:
+	# Divide LFC it by its standard error, resulting in a z-statistic
+	# The z-statistic is compared to a standard normal distribution
+	# p-value = the probability that a z-statistic at least as extreme as the observed value would be selected at random
+	deseq.res <- DESeq(deseq.res, test="Wald", quiet=verbose)
+	
+	if(!is.null(coef_name)) {
+		cat("Extracting results the following coefficient:\n", coef_name, "\n")
+		deseq.res.sig <- results(deseq.res, name=coef_name, pAdjustMethod=pAdjustMethod, tidy=TRUE)
+	} else if(!is.null(contrast_vector)) {
+		cat("Extracting results the following coefficients:\n", contrast_vector, "\n")
+		deseq.res.sig <- results(deseq.res, contrast=contrast_vector, pAdjustMethod=pAdjustMethod, tidy=TRUE)
+	} else {
+		cat("Extracting results for all coefficients:\n", resultsNames(deseq.res)[-1], "\n")
+		deseq.res.sig <- results(deseq.res, pAdjustMethod=pAdjustMethod, tidy=TRUE)
+	}
+	
+	#TODO: add option for lfcShrink() - useful for visualizing results
+	
+	deseq.res.sig <- deseq.res.sig[order(deseq.res.sig$pvalue, decreasing=FALSE),]
+	rownames(deseq.res.sig) <- deseq.res.sig$row
+	hist(deseq.res.sig$pvalue, main="")
+	
+	return(deseq.res.sig)
+	
 }
+
 
 ## Wilcoxon Rank-Sum test
 # norm_counts: normalized count matrix (rows=genes)
@@ -987,7 +1057,7 @@ runWilcox <- function(norm_counts, exp_design, contrast) {
         print("contrast name is missing")
     }
         
-    tab.wilcox <- data.frame(gene=rownames(norm_counts))
+    tab.wilcox <- data.frame(gene=rownames(norm_counts), check.names=FALSE)
     
     dat <- data.frame(t(norm_counts), check.names=FALSE)
     dat$condition <- exp_design[,contrast][match(rownames(dat), exp_design$ID)]
