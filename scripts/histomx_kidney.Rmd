@@ -65,7 +65,6 @@ newRCC <- params$rcc_file
 newPath <- normalizePath(dirname(newRCC))
 dir.create(paste0(newPath, '/histomx_results/'), recursive=TRUE, showWarnings=FALSE)
 outPath=paste0(newPath, '/histomx_results/')
-
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
@@ -74,7 +73,6 @@ newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
 newID <- newPreds$new_scores$ID
 
 newQC <- rccQC(newRCC, outPath)
-
 ```
 
 ***
@@ -177,8 +175,7 @@ dx_tab <- dx_tab %>% dplyr::slice(match(dx_order, Diagnosis))
 dx_tab <- dx_tab[!dx_tab$Diagnosis %in% "normal",]
 dx_tab$Diagnosis[dx_tab$Diagnosis=="amr"]<-"AMR"
 dx_tab$Diagnosis[dx_tab$Diagnosis=="tcmr"]<-"TCMR"
-dx_tab$Diagnosis[dx_tab$Diagnosis=="other"]<-"Injury"
-
+dx_tab$Diagnosis[dx_tab$Diagnosis=="other"]<-"NRKI"
 #dx_tab <- dx_tab %>% relocate('Diagnosis', .before = colnames(dx_tab)[1])
 
 #TODO: scale probabilities relative to normal biopsies (eg. +/- SD)
@@ -195,7 +192,7 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
 
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, No rejection or injury diagnosis, Injury without rejection. The sample range is the confidence interval for the ensemble score.
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis. Outcomes include the following: AMR, TCMR, NRKI (non-rejection kidney injury), No rejection or injury diagnosis. The sample range is the confidence interval for the ensemble score.
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE, fig.align='center', fig.width=6, fig.height=5}
@@ -248,7 +245,7 @@ ms_ref <- ms_ref[ms_ref$Dx != "OTHER",]
 ## q1 and q3 (can also add IQR, min, max)
 tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2), check.names=FALSE)
 colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
-                   "NONREJECTION Q1", "NONREJECTION Q3", "INJURY Q1", "INJURY Q3")
+                   "NONREJECTION Q1", "NONREJECTION Q3", "NRKI Q1", "NRKI Q3")
 rownames(tab) <- rownames(ms_new)
 
 ## add reference biopsy molecular score ranges
@@ -260,8 +257,8 @@ for(i in 1:nrow(tab)) {
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"NONREJECTION Q1"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"NONREJECTION Q3"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="75%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"INJURY Q1"] <- ms_ref[ms_ref$Dx=="INJURY" & ms_ref$Q=="25%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"INJURY Q3"] <- ms_ref[ms_ref$Dx=="INJURY" & ms_ref$Q=="75%",rownames(ms_new)[i]]
+  tab[rownames(tab)==rownames(ms_new)[i],"NRKI Q1"] <- ms_ref[ms_ref$Dx=="NRKI" & ms_ref$Q=="25%",rownames(ms_new)[i]]
+  tab[rownames(tab)==rownames(ms_new)[i],"NRKI Q3"] <- ms_ref[ms_ref$Dx=="NRKI" & ms_ref$Q=="75%",rownames(ms_new)[i]]
 }
 
 tab$'Normal range' <- paste(tab$`NONREJECTION Q1`, "-", tab$`NONREJECTION Q3`)

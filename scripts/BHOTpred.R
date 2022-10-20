@@ -615,7 +615,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     normal.preds$lwr.ci[normal.preds$lwr.ci<0]<-0
     normal.preds$upr.ci[normal.preds$upr.ci>1]<-1
     
-    ## other: injury without rejection
+    ## other=NRKI: non-rejection kidney injury
     other.preds <- all.preds[,grep("other", colnames(all.preds))]
     other.preds[] <- lapply(other.preds[], as.numeric)
     other_ci <- apply(other.preds, 1, function(x) { DescTools::MedianCI(x, conf.level=0.95, method="boot") })
@@ -804,7 +804,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     options(scipen = 0)
 
     ##-----------------------
-    ## output IQR and median scores by Dx for reference Dx
+    ## output IQR and median scores by Dx for reference biopsies
     
     ## add binary Banff lesion scores
     ref.tab <- merge(dx_ref, banff_ref[,c("ID", "iifta0_binary", "v0_binary", "cg0_binary", "ti1_binary", "cv1_binary", 
@@ -835,7 +835,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ref.normal.quantiles$Q <- rownames(ref.normal.quantiles)
     
     ref.other.quantiles <- data.frame(apply(ref.other.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.other.quantiles$Dx <- "INJURY"
+    ref.other.quantiles$Dx <- "NRKI"
     ref.other.quantiles$Q <- rownames(ref.other.quantiles)
 
     ref.score.quantiles <- rbind(ref.amr.quantiles, ref.tcmr.quantiles, ref.normal.quantiles, ref.other.quantiles)
@@ -891,15 +891,14 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     pca.df$Dx <- ifelse(pca.df$ID %in% new_scores$ID, "new", pca.df$Dx)
 
     ## simplify Dx
-    pca.df$Dx <- ifelse(pca.df$Dx %in% c(dx_amr, dx_tcmr, dx_normal, "new"), pca.df$Dx, "Injury w/o rejection")
-    #pca.df$Dx <- ifelse(pca.df$Dx %in% dx_normal, "No rejection/injury Dx", pca.df$Dx)
+    pca.df$Dx <- ifelse(pca.df$Dx %in% c(dx_amr, dx_tcmr, dx_normal, "new"), pca.df$Dx, "NRKI")
        
     ## highlight new biopsy
     pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx!="new", "ref", "new"))
 
     #col_vector=c("firebrick",  "blue3", "mediumpurple", "turquoise", "orangered", "dodgerblue", "salmon",
     #	     "olivedrab2","darkgreen", "black", "palegreen", "lightgray")
-    col_vector=c("firebrick",  "blue3", "salmon", "dodgerblue", "orangered", "lightgray", "black", "gray36")
+    col_vector=c("firebrick",  "blue3", "salmon", "dodgerblue", "orangered", "black", "lightgray", "gray36")
     	     
     pca_new_1_2 <- ggplot() +
         scale_fill_manual(values=col_vector) +
@@ -1125,3 +1124,4 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
           )
 
 }
+

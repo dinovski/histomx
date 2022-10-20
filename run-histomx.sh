@@ -1,7 +1,6 @@
-HISTOMX_PATH=~/Desktop/histomx-v1.8
+HISTOMX_PATH=~/Desktop/histomx
 HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report
 
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_json.Rmd
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney.Rmd
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_bkv.Rmd
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_simple.Rmd
@@ -10,9 +9,7 @@ mkdir -p $HISTOMX_PATH/refRCCs
 #symlink to ref RCCs
 ln -s ~/Dropbox/PTG/transcriptomics/nanostring/kidney/refset/current/RefSet-KTD1-FFPE $HISTOMX_PATH/refRCCs
 
-
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/patient-test.json -r ${HISTOMX_PATH}/test_files/rna-test.json
-
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/patient-test.txt -r ${HISTOMX_PATH}/test_files/rna-test.txt
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/amr.RCC -i 'amr-test'
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/tcmr.RCC -i 'tcmr-test'
