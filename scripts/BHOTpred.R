@@ -136,7 +136,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     if (newRLF != "NS_Hs_Transplant_v1.0") {
       stop("The Gene RLF must be the same as the reference set: nCounter Human Organ Transplant Panel (NS_Hs_Transplant_v1.0)")
     } else {
-      cat(">>Outputting results for sample:", newID, "\n")
+      cat(">>Generating predictions for sample:", newID, "\n")
     }
 
     ## create sample directory in outPath

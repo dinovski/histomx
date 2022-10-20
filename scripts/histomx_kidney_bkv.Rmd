@@ -174,7 +174,10 @@ colnames(dx_tab)[colnames(dx_tab)=="CI"]<-paste(newID, "range")
 
 dx_order <- c("amr", "tcmr", "normal", "other")
 dx_tab <- dx_tab %>% dplyr::slice(match(dx_order, Diagnosis))
-
+dx_tab <- dx_tab[!dx_tab$Diagnosis %in% "normal",]
+dx_tab$Diagnosis[dx_tab$Diagnosis=="amr"]<-"AMR"
+dx_tab$Diagnosis[dx_tab$Diagnosis=="tcmr"]<-"TCMR"
+dx_tab$Diagnosis[dx_tab$Diagnosis=="other"]<-"Injury"
 #dx_tab <- dx_tab %>% relocate('Diagnosis', .before = colnames(dx_tab)[1])
 
 #TODO: scale probabilities relative to normal biopsies (eg. +/- SD)
