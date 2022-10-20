@@ -1,5 +1,5 @@
 ---
-title: "&nbsp;v1.8"
+title: "&nbsp;v1.9"
 output:
   prettydoc::html_pretty:
     theme: architect
@@ -40,7 +40,6 @@ library(knitr, quietly=TRUE)
 opts_knit$set(eval.after = "fig.cap")
 library(kableExtra, quietly=TRUE)
 knitr::opts_chunk$set(echo = TRUE)
-library(rjson)
 ```
 
 ***
@@ -48,14 +47,11 @@ library(rjson)
 > **Team leader:** Pr Alexandre Loupy MD/PhD  
 **Project managers:** Fariza Mezine & Blaise Robin  
 **Bioinformatician:** Dina Zielinski PhD
-**Clinical reviewer:** Valentin Goutaudier MD  
+**Clinical reviewer:** Olivier Aubert MD/PhD    
 **Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85  
 > Inserm U970 - 56 rue Leblanc 75015 Paris, France
 
 ```{r, echo=FALSE, warning=FALSE, include=FALSE, eval=TRUE}
-## import functions
-source('../scripts/BHOT.R')
-## import reference set, normalize new sample with reference samples and output predictions
 source('../scripts/BHOTpred.R')
 ```
 
@@ -74,12 +70,9 @@ outPath=paste0(newPath, '/histomx_results/')
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
-## and return a list of these files
 newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
-#dev.off()
-newID <- gsub("-", ".", newPreds$score_table$ID)
+newID <- newPreds$new_scores$ID
 
-## Output sequencing run info
 newQC <- rccQC(newRCC, outPath)
 
 ```
@@ -88,6 +81,7 @@ newQC <- rccQC(newRCC, outPath)
 ## Sample info:
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
+## check if sample info exists; check file type (json or txt) and import
 if(!is.na(file.info(newPatient)$size)) {
   
 	if (tools::file_ext(newPatient) == "json") {
@@ -96,7 +90,7 @@ if(!is.na(file.info(newPatient)$size)) {
 	} else if (tools::file_ext(newPatient) == "txt") {
 		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"))
 	} else {
-		stop("Patient file must be a .json or tab delimited .txt file")
+		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
     
 	## exclude empty cells
@@ -104,7 +98,7 @@ if(!is.na(file.info(newPatient)$size)) {
       
 } else {
 	## display empty data frame
-	pt_df <- data.frame('Platform ID'=newPreds$score_table$ID,
+	pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
                         'Date of transplantation'=" ", 'Date of biopsy'=" ",
                         'Biopsy indication'="    ", check.names=FALSE)
 	pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
@@ -132,53 +126,56 @@ if(nrow(pt_df) %% 2 == 0) {
 ***
 ### Diagnosis based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
+
 ## molecular score table
-ms_new <- data.frame(t(newPreds$score_table[,c("AMR", "TCMR", "IFTA", "OTHER")]))
+ms_new <- data.frame(t(newPreds$new_scores[,c("amr", "tcmr", "normal", "other")]), check.names=FALSE)
+ms_new$Diagnosis <- rownames(ms_new)
+
+## confidence intervals
+ci_tab <- data.frame(newPreds$new_scores[,grep("_ci", names(newPreds$new_scores))])
+ci_new <- data.frame(amr=paste(ci_tab$amr_lwr_ci, "-", ci_tab$amr_upr_ci),
+		     tcmr=paste(ci_tab$tcmr_lwr_ci, "-", ci_tab$tcmr_upr_ci),
+		     normal=paste(ci_tab$normal_lwr_ci, "-", ci_tab$normal_upr_ci),
+		     other=paste(ci_tab$other_lwr_ci, "-", ci_tab$other_upr_ci))
+ci_new <- data.frame(CI=t(ci_new))
+ci_new$Diagnosis <- rownames(ci_new)
 
 ## reference set quantiles
-ms_ref <- newPreds$ref_scores[,c("Dx", "AMR", "TCMR", "OTHER", "IFTA", "Q")]
+ms_ref <- newPreds$ref_scores[,c("Dx", "amr", "tcmr", "normal", "other", "Q")]
  
 ## q1 and q3 (can also add IQR, min, max)
-#tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
-#colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3", "ATI Q1", "ATI Q3", "No lesion Q1", "No lesion Q3")
-
-tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=2))
-colnames(tab) <- c("No lesion Q1", "No lesion Q3")
+tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=2), check.names=FALSE)
+colnames(tab) <- c("No rejection Q1", "No rejection Q3")
 rownames(tab) <- rownames(ms_new)
 
 ## rows=molecular scores; columns=histo diagnosis
 ## reference biopsy AMR molecular score ranges
-# tab[rownames(tab)=="AMR","AMR Q1"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="25%","AMR"]
-# tab[rownames(tab)=="AMR","AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%","AMR"]
-# tab[rownames(tab)=="AMR","TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%","AMR"]
-# tab[rownames(tab)=="AMR","TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%","AMR"]
-# tab[rownames(tab)=="AMR","ATI Q1"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="25%","AMR"]
-# tab[rownames(tab)=="AMR","ATI Q3"] <- ms_ref[ms_ref$Dx=="ATI" & ms_ref$Q=="75%","AMR"]
-tab[rownames(tab)=="AMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","AMR"]
-tab[rownames(tab)=="AMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","AMR"]
+tab[rownames(tab)=="amr","No rejection Q1"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="25%","amr"]
+tab[rownames(tab)=="amr","No rejection Q3"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="75%","amr"]
 
-## reference biopsy acute TCMR molecular score ranges
-tab[rownames(tab)=="TCMR","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","TCMR"]
-tab[rownames(tab)=="TCMR","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","TCMR"]
+## reference biopsy TCMR molecular score ranges
+tab[rownames(tab)=="tcmr","No rejection Q1"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="25%","tcmr"]
+tab[rownames(tab)=="tcmr","No rejection Q3"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="75%","tcmr"]
 
-## reference biopsy IFTA molecular score ranges
-tab[rownames(tab)=="IFTA","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","IFTA"]
-tab[rownames(tab)=="IFTA","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","IFTA"]
+## reference biopsy Nonrejection molecular score ranges
+tab[rownames(tab)=="normal","No rejection Q1"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="25%","normal"]
+tab[rownames(tab)=="normal","No rejection Q3"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="75%","normal"]
 
-## reference biopsy OTHER molecular score ranges
-tab[rownames(tab)=="OTHER","No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%","OTHER"]
-tab[rownames(tab)=="OTHER","No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%","OTHER"]
+## reference biopsy non-rejection related injury molecular score ranges
+tab[rownames(tab)=="other","No rejection Q1"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="25%","other"]
+tab[rownames(tab)=="other","No rejection Q3"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="75%","other"]
 
-tab <- tab[!is.na(colnames(tab))]
-#tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
-#tab$'TCMR range' <- paste(tab$`TCMR Q1`, "-", tab$`TCMR Q3`)
-#tab$'TCMR range' <- paste(tab$`ATI Q1`, "-", tab$`ATN Q3`)
-tab$'Normal range' <- paste(tab$`No lesion Q1`, "-", tab$`No lesion Q3`)
+tab$'Normal range' <- paste(tab$`No rejection Q1`, "-", tab$`No rejection Q3`)
 tab$'Diagnosis' <- rownames(tab)
+tab <- merge(tab, ci_new, by="Diagnosis")
 
-#dx_tab <- tab[tab$'Molecular score' != "No specific Dx",] ## exclude 'normal' molecular score
-dx_tab <- cbind(ms_new, tab[,c("Diagnosis", "Normal range")])
-dx_tab <- dx_tab %>% relocate('Diagnosis', .before = colnames(dx_tab)[1])
+dx_tab <- merge(ms_new, tab[,c("Diagnosis", "CI", "Normal range")], by="Diagnosis")
+colnames(dx_tab)[colnames(dx_tab)=="CI"]<-paste(newID, "range")
+
+dx_order <- c("amr", "tcmr", "normal", "other")
+dx_tab <- dx_tab %>% dplyr::slice(match(dx_order, Diagnosis))
+
+#dx_tab <- dx_tab %>% relocate('Diagnosis', .before = colnames(dx_tab)[1])
 
 #TODO: scale probabilities relative to normal biopsies (eg. +/- SD)
 dx_tab$Interpretation <- ifelse(dx_tab[,newID]<=10,"unlikely",
@@ -190,15 +187,15 @@ dx_tab$Interpretation <- ifelse(dx_tab[,newID]<=10,"unlikely",
 
 kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
-    column_spec(2, bold=TRUE, color="dodgerblue") %>%
+    column_spec(c(2,3), bold=TRUE, color="dodgerblue") %>%
     row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
 
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, and atrophy/fibrosis (isolated IFTA).
+Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis: AMR, TCMR, No rejection or injury diagnosis, Injury without rejection. The sample range is the confidence interval for the ensemble score.
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE, fig.align='center', fig.width=6, fig.height=5}
-banff_preds <- data.frame(t(newPreds$score_table))
+banff_preds <- data.frame(t(newPreds$new_scores))
 banff_tab <- data.frame(lesion=c("g", "ptc", "i", "t"))
 banff_tab$'0' <- as.numeric(banff_preds[c("g0", "ptc0", "i0", "t0"),])
 banff_tab$'1' <- as.numeric(banff_preds[c("g1", "ptc1", "i1", "t1"),])
@@ -234,19 +231,20 @@ The above Banff lesion based scores represent the probability for each score and
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
-## table of molecular scores
-ms_new <- data.frame(t(newPreds$score_table[,c("cg0_binary", "iifta0_binary", "v0_binary", "cv1_binary", "ci1_binary", "ct1_binary")]))
+## new sample molecular scores
+ms_new <- data.frame(t(newPreds$new_scores[,c("cg0_binary", "iifta0_binary", "v0_binary", "cv1_binary", "ci1_binary", "ct1_binary")]), check.names=FALSE)
 rownames(ms_new) <- gsub("\\_binary", "", rownames(ms_new))
-
-## reference set quantiles
+ms_new$lesion <- rownames(ms_new)
+	
+## reference set quantiles: newPreds$ref_scores
 ms_ref <- newPreds$ref_scores[,c("Dx", "cg0_binary", "iifta0_binary", "v0_binary", "cv1_binary", "ci1_binary", "ct1_binary", "Q")]
 colnames(ms_ref) <- gsub("\\_binary", "", colnames(ms_ref))
 ms_ref <- ms_ref[ms_ref$Dx != "OTHER",]
 
 ## q1 and q3 (can also add IQR, min, max)
-tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2))
+tab <- data.frame(matrix(nrow=dim(ms_new)[1], ncol=length(unique(ms_ref$Dx))*2), check.names=FALSE)
 colnames(tab) <- c("AMR Q1", "AMR Q3", "TCMR Q1", "TCMR Q3",
-                   "IFTA Q1", "IFTA Q3", "No lesion Q1", "No lesion Q3")
+                   "NONREJECTION Q1", "NONREJECTION Q3", "INJURY Q1", "INJURY Q3")
 rownames(tab) <- rownames(ms_new)
 
 ## add reference biopsy molecular score ranges
@@ -256,24 +254,20 @@ for(i in 1:nrow(tab)) {
   tab[rownames(tab)==rownames(ms_new)[i],"AMR Q3"] <- ms_ref[ms_ref$Dx=="AMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q1"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="25%",rownames(ms_new)[i]]
   tab[rownames(tab)==rownames(ms_new)[i],"TCMR Q3"] <- ms_ref[ms_ref$Dx=="TCMR" & ms_ref$Q=="75%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"IFTA Q1"] <- ms_ref[ms_ref$Dx=="IFTA" & ms_ref$Q=="25%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"IFTA Q3"] <- ms_ref[ms_ref$Dx=="IFTA" & ms_ref$Q=="75%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"No lesion Q1"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="25%",rownames(ms_new)[i]]
-  tab[rownames(tab)==rownames(ms_new)[i],"No lesion Q3"] <- ms_ref[ms_ref$Dx=="No specific Dx" & ms_ref$Q=="75%",rownames(ms_new)[i]]
+  tab[rownames(tab)==rownames(ms_new)[i],"NONREJECTION Q1"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="25%",rownames(ms_new)[i]]
+  tab[rownames(tab)==rownames(ms_new)[i],"NONREJECTION Q3"] <- ms_ref[ms_ref$Dx=="NONREJECTION" & ms_ref$Q=="75%",rownames(ms_new)[i]]
+  tab[rownames(tab)==rownames(ms_new)[i],"INJURY Q1"] <- ms_ref[ms_ref$Dx=="INJURY" & ms_ref$Q=="25%",rownames(ms_new)[i]]
+  tab[rownames(tab)==rownames(ms_new)[i],"INJURY Q3"] <- ms_ref[ms_ref$Dx=="INJURY" & ms_ref$Q=="75%",rownames(ms_new)[i]]
 }
 
-#tab <- tab[!is.na(colnames(tab))]
-tab$'AMR range' <- paste(tab$`AMR Q1`, "-", tab$`AMR Q3`)
-tab$'TCMR range' <- paste(tab$`TCMR Q1`, "-", tab$`TCMR Q3`)
-tab$'IFTA range' <- paste(tab$`IFTA Q1`, "-", tab$`IFTA Q3`)
-tab$'Normal range' <- paste(tab$`No lesion Q1`, "-", tab$`No lesion Q3`)
-tab$'lesion' <- gsub("_", " ", rownames(tab))
+tab$'Normal range' <- paste(tab$`NONREJECTION Q1`, "-", tab$`NONREJECTION Q3`)
+tab$'lesion' <- rownames(tab)
 
 if(!all(rownames(ms_new)==rownames(tab))) {
   stop("check concordance of lesion score names between new sample and refset")
 }
 
-tab <- cbind(ms_new, tab)
+tab <- merge(ms_new, tab, by="lesion")
 
 tab$Interpretation <- ifelse(tab[,newID]<=10,"unlikely",
                                        ifelse(tab[,newID]>10 & tab[,newID]<=20,"low probability",
@@ -333,36 +327,6 @@ kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html")
 \newpage
 
 ***
-### Pathway analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the absolute # of enriched genes; the heatmap indciates the % of genes associated with the given pathway).'}
-
-#gridExtra::grid.arrange(newPreds$cell_type_radar, newPreds$pathway_radar, ncol=2, nrow=1)
-
-newPreds$pathway_radar
-
-# pw_df <- newPreds$pathways
-# pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
-# kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
-#           row_spec(1:nrow(pw_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-```
-
-***
-### Cell type analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed cell type.'}
-
-newPreds$cell_type_radar
-
-# ct_df <- newPreds$cell_types
-# ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
-# kable(ct_df, row.names=FALSE, col.names=rep("", ncol(ct_df)), align='c', format="html") %>%
-#           row_spec(1:nrow(ct_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-```
-
-\newpage
-
-***
 ### Clinician signout
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
 sign_df <- data.frame(Name=">", Signature="")
@@ -388,54 +352,59 @@ kable(sign_df, align='c', format="html") %>% kableExtra::kable_styling(position=
 
 if(!is.na(file.info(newRNA)$size)) {
   
-  ## json to data frame
-  jfile <- fromJSON(file=newRNA)
-  rna_df <- as.data.frame(jfile, check.names=F)
+  	if (tools::file_ext(newRNA) == "json") {
+		jfile <- fromJSON(file=newRNA)
+		rna_df <- as.data.frame(jfile, check.names=F)
+	} else if (tools::file_ext(newRNA) == "txt") {
+		rna_df <- read.table(newRNA, check.names=F, sep='\t')
+	} else {
+		stop("Sample info file must be a .json or tab delimited .txt file")
+	}	
 
-  ## transpose and use first column as header
-  if(nrow(rna_df) > 2) {
-    rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])
-  }
+	## transpose and use first column as header
+	if(nrow(rna_df) > 2) {
+		rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])
+	}
 
-  ## if units (ng/ul) included in RNA concentration strip; else convert to numeric
-  if(length(strsplit(rna_df$concentration, " ")[[1]]) > 1) {
-    rna_df$concentration <- as.numeric(strsplit(rna_df$concentration, " ")[[1]][1])
-  } else {
-    rna_df$concentration <- as.numeric(rna_df$concentration)
-  }
+	## if units (ng/ul) included in RNA concentration strip; else convert to numeric
+	if(length(strsplit(rna_df$concentration, " ")[[1]]) > 1) {
+		rna_df$concentration <- as.numeric(strsplit(rna_df$concentration, " ")[[1]][1])
+	} else {
+		rna_df$concentration <- as.numeric(rna_df$concentration)
+	}
 
-  ## make sure units follow concentration
-  rna_df <- rna_df %>% relocate(units, .after=concentration)
+	## move concentration to end
+	rna_df <- rna_df %>% relocate(concentration, .after=last_col())
 
-  ## apply threshold based text color and add back units
-  if(rna_df$concentration >= 20) {
-      rna_df$status <- "Passed"
-      rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
-      status_color="green"
-  } else if(rna_df$concentration>=10 & rna_df$concentration<20) {
-      rna_df$status <- "Caution"
-      rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
-      status_color="goldenrod"
-  } else if(rna_df$concentration < 10) {
-      rna_df$status <- "Warning"
-      rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
-      status_color="firebrick"
-  }
+	## apply threshold based text color and add back units
+	if(rna_df$concentration >= 20) {
+		rna_df$status <- "Passed"
+		rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
+		status_color="green"
+	} else if(rna_df$concentration>=10 & rna_df$concentration<20) {
+		rna_df$status <- "Caution"
+		rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
+		status_color="goldenrod"
+	} else if(rna_df$concentration < 10) {
+		rna_df$status <- "Warning"
+		rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
+		status_color="firebrick"
+	}
 
-  kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
-    column_spec(1, bold=TRUE, color="dodgerblue") %>%
-    column_spec(ncol(rna_df), bold=TRUE, color=status_color) %>%
-    row_spec(1, background="white")
+	kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
+	column_spec(1, bold=TRUE, color="dodgerblue") %>%
+	column_spec(ncol(rna_df), bold=TRUE, color=status_color) %>%
+	row_spec(1, background="white")
   
 } else {
-  ## display empty data frame
-  rna_df <- data.frame(ID=newPreds$score_table$ID, '260/280 ratio'="", '260/230 ratio'="",
+	## display empty data frame
+	rna_df <- data.frame(ID=newPreds$new_scores$ID, '260/280 ratio'="", '260/230 ratio'="",
                        concentration="", status="", check.names=FALSE)
   
-  kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
-      column_spec(1, bold=TRUE, color="dodgerblue") %>%
-      column_spec(ncol(rna_df), bold=TRUE) %>%
-      row_spec(1, background="white")
+	kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
+	column_spec(1, bold=TRUE, color="dodgerblue") %>%
+	column_spec(ncol(rna_df), bold=TRUE) %>%
+	row_spec(1, background="white")
 }
 
 ```
@@ -447,7 +416,8 @@ if(!is.na(file.info(newRNA)$size)) {
 newQC$qc_table$variable <- rownames(newQC$qc_table)
 #newQC$qc_table <- newQC$qc_table[!rownames(newQC$qc_table) %in% "POS_E counts",]
 
-qcTab <- newQC$qc_table[,c("variable", newID)]
+qcTab <- newQC$qc_table
+colnames(qcTab) <- c(newID, "variable")
 qcTab <- qcTab[!qcTab$variable %in% c("FovCount", "FovCounted", "ncgMean", "ncgSD", "FileVersion"),]
 
 qcTab <- cbind(qcTab[1:(nrow(qcTab)/2),], qcTab[(nrow(qcTab)/2+1):nrow(qcTab),])
