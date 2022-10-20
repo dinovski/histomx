@@ -1,7 +1,7 @@
 ## THIS IS THE MASTER SCRIPT (~/Dropbox/PTG/transcriptomics/nanostring/scripts/BHOTR/scripts/)
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "rjson", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
