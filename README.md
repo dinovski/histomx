@@ -66,7 +66,7 @@ RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney.Rmd
 # standard report + BKV expression
 RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_bkv.Rmd
 # standard report w/o pathways
-RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_simple.Rmd
+RMD_FILE=${HISTOMX_PATH}/scripts/histomx_kidney_no_pathways.Rmd
 ```
 
 The following are 2 examples (with and without patient or RNA QC files)
