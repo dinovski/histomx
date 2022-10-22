@@ -224,7 +224,16 @@ ggplot(banff.df, aes(x=variable, y=lesion, size=value)) + xlab("") + ylab("") +
 	      legend.text=element_text(size=14, color="darkslateblue"), legend.key.size = unit(1, 'cm'),
 	      panel.border=element_rect(colour="gray", fill=NA, size=1))
 
-kable(banff_tab, row.names=FALSE, align='c', format="html") %>%
+## cumulative probability
+#banff_tab$'> 2' <- banff_tab$'3'
+#banff_tab$'> 1' <- banff_tab$'2' + banff_tab$'3'
+#banff_tab$'> 0' <- banff_tab$'1' + banff_tab$'2' + banff_tab$'3'
+
+banff_tab$'< 1' <- banff_tab$'0'
+banff_tab$'< 2' <- banff_tab$'0' + banff_tab$'1'
+banff_tab$'< 3' <- banff_tab$'0' + banff_tab$'1' + banff_tab$'2'
+
+kable(banff_tab[,c("lesion", "< 1", "< 2", "< 3")], row.names=FALSE, align='c', format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
     row_spec(c(1,3), background="whitesmoke") %>% row_spec(c(2,4), background="white")
 ```

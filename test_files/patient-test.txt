@@ -7,7 +7,7 @@ Biopsy indication
 Initial nephropathy	IgA Nephropathy
 Immunosuppressive therapy       	
 DSA	
-Histology	"Acute TCMR grade I (Banff: i2 t2 v1 g0, c1, ct1)"
+Histology	"Acute TCMR grade I (Banff: i2 t2 v1 g0, ci1, ct1)"
 Creatininemia	
 Proteinuria/creatininuria ratio	
 BK viremia	
