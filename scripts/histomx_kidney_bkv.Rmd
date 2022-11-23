@@ -45,8 +45,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ***
 ## Molecular Pathology Platform
 > **Team leader:** Pr Alexandre Loupy MD/PhD  
-**Project managers:** Fariza Mezine & Blaise Robin  
-**Bioinformatician:** Dina Zielinski PhD
+**Project managers:** Fariza Mezine & Dina Zielinski PhD  
 **Clinical reviewer:** Olivier Aubert MD/PhD    
 **Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85  
 > Inserm U970 - 56 rue Leblanc 75015 Paris, France
@@ -92,12 +91,22 @@ if(!is.na(file.info(newPatient)$size)) {
 	} else {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
-    
-	## exclude empty cells
-	pt_df <- pt_df %>% filter_all(all_vars(!is.na(.)))
+	
+	## if file contains no info, display empty data frame
+	if (empty(pt_df)==TRUE) {
+		
+		pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
+                        'Date of transplantation'=" ", 'Date of biopsy'=" ",
+                        'Biopsy indication'="    ", check.names=FALSE)
+		pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
+	} else {
+		## exclude empty cells
+		pt_df <- pt_df %>% filter_all(all_vars(!is.na(.)))
+	}
+
       
 } else {
-	## display empty data frame
+	## if no file, display empty data frame
 	pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
                         'Date of transplantation'=" ", 'Date of biopsy'=" ",
                         'Biopsy indication'="    ", check.names=FALSE)
@@ -225,13 +234,9 @@ ggplot(banff.df, aes(x=variable, y=lesion, size=value)) + xlab("") + ylab("") +
 	      panel.border=element_rect(colour="gray", fill=NA, size=1))
 
 ## cumulative probability
-#banff_tab$'> 2' <- banff_tab$'3'
-#banff_tab$'> 1' <- banff_tab$'2' + banff_tab$'3'
-#banff_tab$'> 0' <- banff_tab$'1' + banff_tab$'2' + banff_tab$'3'
-
 banff_tab$'< 1' <- banff_tab$'0'
 banff_tab$'< 2' <- banff_tab$'0' + banff_tab$'1'
-banff_tab$'< 3' <- banff_tab$'0' + banff_tab$'1' + banff_tab$'2'
+banff_tab$'< 3' <-  banff_tab$'0' + banff_tab$'1' + banff_tab$'2'
 
 kable(banff_tab[,c("lesion", "< 1", "< 2", "< 3")], row.names=FALSE, align='c', format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
