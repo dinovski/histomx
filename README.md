@@ -38,19 +38,7 @@ HISTOMX_PATH=~/Desktop/histomx-main
 HISTOMX=${HISTOMX_PATH}/bin/render-histomx_report  
 ```
 
-6. Create a directory called 'refRCCs'.
-```
-mkdir -p ${HISTOMX_PATH}/refRCCs
-```
-
-7. Download all reference RCC files from the server.  
-
-8. Move all RCC files to this directory:
-```
-mv ~/Downloads/RefSet-KTD1-FFPE/* refRCCs/
-```
-
-9. Run histomx on a single RCC file to generate the report
+6. Run histomx on a single RCC file to generate the report
 * This will output an .html file (you can specify the name of the file with the '-i' argument).
 * The -m (or --rmd) and -f (or --rcc) arguments are required
 
@@ -73,7 +61,7 @@ The following are 2 examples (with and without patient or RNA QC files)
 ```
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run'
 ```
-With optional patient and RNA sample files:
+With optional patient and RNA sample files (.txt or .json):
 ```
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run' -p ${HISTOMX_PATH}/test_files/patient-test.txt -r ${HISTOMX_PATH}/test_files/rna-test.txt
 ```
