@@ -381,30 +381,29 @@ if(!is.na(file.info(newRNA)$size)) {
 	## transpose and use first column as header
 	if(nrow(rna_df) > 2) {
 		rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])
-	}
-
-	## if units (ng/ul) included in RNA concentration strip; else convert to numeric
-	if(length(strsplit(rna_df$concentration, " ")[[1]]) > 1) {
-		rna_df$concentration <- as.numeric(strsplit(rna_df$concentration, " ")[[1]][1])
-	} else {
 		rna_df$concentration <- as.numeric(rna_df$concentration)
 	}
 
-	## move concentration to end
+	## if units (ng/ul) included in RNA concentration strip; else convert to numeric
+	#if(length(strsplit(rna_df$concentration, " ")[[1]]) > 1) {
+	#	rna_df$concentration <- as.numeric(strsplit(rna_df$concentration, " ")[[1]][1])
+	#} else {
+	#	rna_df$concentration <- as.numeric(rna_df$concentration)
+	#}
+
+	## move concentration and units to end
 	rna_df <- rna_df %>% relocate(concentration, .after=last_col())
+	rna_df <- rna_df %>% relocate(units, .after=last_col())
 
 	## apply threshold based text color and add back units
 	if(rna_df$concentration >= 20) {
 		rna_df$status <- "Passed"
-		rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
 		status_color="green"
 	} else if(rna_df$concentration>=10 & rna_df$concentration<20) {
 		rna_df$status <- "Caution"
-		rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
 		status_color="goldenrod"
 	} else if(rna_df$concentration < 10) {
 		rna_df$status <- "Warning"
-		rna_df$concentration <- paste(rna_df$concentration, "ng/ul")
 		status_color="firebrick"
 	}
 
