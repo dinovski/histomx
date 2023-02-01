@@ -200,7 +200,7 @@ Diagnosis based scores represent the probability (0-100%) that a biopsy has an e
 ***
 ## Principal Components Analysis (PCA) of molecular scores:
 <div style="margin-bottom:40px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Samples are labeled by histologic diagnosis. The tested sample is the yellow diamond.'}
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Samples are labeled by histologic diagnosis (NRKI=non-rejection kidney injury). The tested sample is the yellow diamond.'}
 
 #gridExtra::grid.arrange(newPreds$pca_1_2, newPreds$pca_2_3, ncol=2)
 newPreds$pca_1_2
