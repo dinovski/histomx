@@ -68,8 +68,7 @@ All output files are written to the same directory as the input RCC file (in thi
 
 To convert the html report to a pageless pdf, open the file in a web browser and export as a PDF.
  
-To convert the html report to a paged pdf, download https://wkhtmltopdf.org/
-Then, run the following command:
+To convert the html report to a paged pdf, download https://wkhtmltopdf.org/ then run the following command:
 ```
 wkhtmltopdf histomx.html histomx.pdf
  ```
