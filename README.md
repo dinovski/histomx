@@ -66,6 +66,17 @@ $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test-run' -p 
 ```
 All output files are written to the same directory as the input RCC file (in this case 'test_files')
 
+To convert the html report to a pageless pdf, open the file in a web browser and export as a PDF.
+ 
+To convert the html report to a paged pdf, download https://wkhtmltopdf.org/
+Then, run the following command:
+```
+wkhtmltopdf histomx.html histomx.pdf
+ ```
+If the above is not working try running wkhtmltopdf with the following parameters:
+```
+wkhtmltopdf --no-stop-slow-scripts --enable-local-file-access --javascript-delay 100 histomx.html histomx.pdf
+```
 
 **TROUBLESHOOTING:**  
 If you see an error with 'pandoc' you may need to update your version of RStudio. See here:  
