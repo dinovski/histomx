@@ -1,5 +1,5 @@
 
-#setwd('~/Desktop/histomx-v1.9/bin/')
+#setwd('~/Desktop/histomx/bin/')
 
 ## predict probability of rejection on new biopsy
 source('../scripts/BHOT.R')
@@ -16,31 +16,41 @@ aa_model <- get(load(paste0(modelPath, 'aa_model.rda')))
 ##----------
 ## diagnosis base models
 
-glm.model <- get(load(paste0(modelPath, 'dx_model_glm.rda')))
-c5.model <- get(load(paste0(modelPath, 'dx_model_c5.rda')))
-gbm.model <- get(load(paste0(modelPath, 'dx_model_gbm.rda')))
-knn.model <- get(load(paste0(modelPath, 'dx_model_knn.rda')))
-lda.model <- get(load(paste0(modelPath, 'dx_model_lda.rda')))
-rf.model <- get(load(paste0(modelPath, 'dx_model_rf.rda')))
-svm.model <- get(load(paste0(modelPath, 'dx_model_svm.rda')))
-xgb.model <- get(load(paste0(modelPath, 'dx_model_xgb.rda')))
+## amr base models
+amr.glm.model <- get(load(paste0(modelPath, '/amr_models/amr_model_glm.rda')))
+amr.glmnet.model <- get(load(paste0(modelPath, '/amr_models/amr_model_glmnet.rda')))
+amr.lda.model <- get(load(paste0(modelPath, '/amr_models/amr_model_lda.rda')))
+amr.svmlinear.model <- get(load(paste0(modelPath, '/amr_models/amr_model_svmlinear.rda')))
+amr.svmradial.model <- get(load(paste0(modelPath, '/amr_models/amr_model_svmradial.rda')))
+
+## tcmr base models
+tcmr.glm.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_glm.rda')))
+tcmr.glmnet.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_glmnet.rda')))
+tcmr.lda.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_lda.rda')))
+tcmr.svmlinear.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_svmlinear.rda')))
+tcmr.svmradial.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_svmradial.rda')))
+
+## non-rejection base models
+normal.glm.model <- get(load(paste0(modelPath, '/normal_models/normal_model_glm.rda')))
+normal.glmnet.model <- get(load(paste0(modelPath, '/normal_models/normal_model_glmnet.rda')))
+normal.lda.model <- get(load(paste0(modelPath, '/normal_models/normal_model_lda.rda')))
+normal.svmlinear.model <- get(load(paste0(modelPath, '/normal_models/normal_model_svmlinear.rda')))
+normal.svmradial.model <- get(load(paste0(modelPath, '/normal_models/normal_model_svmradial.rda')))
 
 ##----------
 ## banff lesions
 
 ## ordinal
-g_score.model <- get(load(paste0(modelPath, 'g_ordinal_model.RData')))
-ptc_score.model <- get(load(paste0(modelPath, 'ptc_ordinal_model.RData')))
-i_score.model <- get(load(paste0(modelPath, 'i_ordinal_model.RData')))
-t_score.model <- get(load(paste0(modelPath, 't_ordinal_model.RData')))
+g_score.model <- get(load(paste0(modelPath, '/lesion_models/g_ordinal_model.RData')))
+ptc_score.model <- get(load(paste0(modelPath, '/lesion_models/ptc_ordinal_model.RData')))
+i_score.model <- get(load(paste0(modelPath, '/lesion_models/i_ordinal_model.RData')))
+t_score.model <- get(load(paste0(modelPath, '/lesion_models/t_ordinal_model.RData')))
 
 ## binary
-cg0_score.model <- get(load(paste0(modelPath, 'cg0_score_model.RData')))
-v0_score.model <- get(load(paste0(modelPath, 'v0_score_model.RData')))
-iifta0_score.model <- get(load(paste0(modelPath, 'iifta0_score_model.RData')))
-ci1_score.model <- get(load(paste0(modelPath, 'ci1_score_model.RData')))
-ct1_score.model <- get(load(paste0(modelPath, 'ct1_score_model.RData')))
-cv1_score.model <- get(load(paste0(modelPath, 'cv1_score_model.RData')))
+cg0_score.model <- get(load(paste0(modelPath, '/lesion_models/cg0_score_model.RData')))
+iifta0_score.model <- get(load(paste0(modelPath, '/lesion_models/iifta0_score_model.RData')))
+ci1_score.model <- get(load(paste0(modelPath, '/lesion_models/ci1_score_model.RData')))
+ct1_score.model <- get(load(paste0(modelPath, '/lesion_models/ct1_score_model.RData')))
 
 ##----------
 ## import refSet Dx molecular scores + Dx + archetype cluster
@@ -54,6 +64,7 @@ banff_ref <- read.table('../model_data/kidney/tables/refset_molecular_scores_ban
 exp_design <- read.table('../model_data/kidney/tables/exp_design.txt', header=TRUE, sep='\t')
 
 ## Define histology diagnosis categories
+#table(banff_ref$Dx)
 dx_amr <- c("Active AMR", "Chronic active AMR", "Chronic inactive AMR")
 dx_tcmr <- c("Acute TCMR", "Chronic active TCMR")
 dx_normal <- c("Normal or minimal changes", "Pristine")
@@ -552,36 +563,86 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #         axis.title.y=element_text(size=12, family="sans", colour="black"))
 
     ##--------------------------
-    ## Diagnostic base models
-    dx.genes <- colnames(coef(glm.model$finalModel))
-    dx.genes <- dx.genes[grep("Intercept", dx.genes, invert=TRUE)]
-    dx.genes <- gsub("`", "", dx.genes)
+    ## AMR base models
+    amr.genes <- names(coef(amr.glm.model$finalModel))
+    amr.genes <- amr.genes[grep("Intercept", amr.genes, invert=TRUE)]
+    amr.genes <- gsub("`", "", amr.genes)
     
     new.ge <- new.ns.norm
-    
     new.ge <- data.frame(t(new.ge), check.names=FALSE)
-    new.ge <- new.ge[,colnames(new.ge) %in% dx.genes]
+    new.ge <- new.ge[,colnames(new.ge) %in% amr.genes]
     
-    ## base model prediction
-    glm.preds <- predict(glm.model, newdata = new.ge, type='prob')
-    c5.preds <- predict(c5.model, newdata = new.ge, type='prob')
-    gbm.preds <- predict(gbm.model, newdata = new.ge, type='prob')
-    knn.preds <- predict(knn.model, newdata = new.ge, type='prob')
-    lda.preds <- predict(lda.model, newdata = new.ge, type='prob')
-    rf.preds <- predict(rf.model, newdata = new.ge, type='prob')
-    svm.preds <- predict(svm.model, newdata = new.ge, type='prob')
-    xgb.preds <- predict(xgb.model, newdata = new.ge, type='prob')
+    ## base model predictions
+    amr.glm.preds <- predict(amr.glm.model, newdata = new.ge, type='prob')
+    amr.glmnet.preds <- predict(amr.glmnet.model, newdata = new.ge, type='prob')
+    amr.lda.preds <- predict(amr.lda.model, newdata = new.ge, type='prob')
+    amr.svmlinear.preds <- predict(amr.svmlinear.model, newdata = new.ge, type='prob')
+    amr.svmradial.preds <- predict(amr.svmradial.model, newdata = new.ge, type='prob')
+
+    colnames(amr.glm.preds) <- paste0(colnames(amr.glm.preds), ".glm")
+    colnames(amr.glmnet.preds) <- paste0(colnames(amr.glmnet.preds), ".glmnet")
+    colnames(amr.lda.preds) <- paste0(colnames(amr.lda.preds), ".lda")
+    colnames(amr.svmlinear.preds) <- paste0(colnames(amr.svmlinear.preds), ".svmlinear")
+    colnames(amr.svmradial.preds) <- paste0(colnames(amr.svmradial.preds), ".svmradial")
     
-    colnames(glm.preds) <- paste0(colnames(glm.preds), ".glm")
-    colnames(c5.preds) <- paste0(colnames(c5.preds), ".c5")
-    colnames(gbm.preds) <- paste0(colnames(gbm.preds), ".gbm")
-    colnames(knn.preds) <- paste0(colnames(knn.preds), ".knn")
-    colnames(lda.preds) <- paste0(colnames(lda.preds), ".lda")
-    colnames(rf.preds) <- paste0(colnames(rf.preds), ".rf")
-    colnames(svm.preds) <- paste0(colnames(svm.preds), ".svm")
-    colnames(xgb.preds) <- paste0(colnames(svm.preds), ".xgb")
+    amr.all.preds <- cbind(amr.glm.preds, amr.glmnet.preds, amr.lda.preds, amr.svmlinear.preds, amr.svmradial.preds)
+    amr.all.preds <- amr.all.preds[,grep("amr", colnames(amr.all.preds))]
     
-    all.preds <- cbind(glm.preds, c5.preds, gbm.preds, knn.preds, lda.preds, rf.preds, svm.preds, xgb.preds)
+    ##--------------------------
+    ## TCMR base models
+    tcmr.genes <- names(coef(tcmr.glm.model$finalModel))
+    tcmr.genes <- tcmr.genes[grep("Intercept", tcmr.genes, invert=TRUE)]
+    tcmr.genes <- gsub("`", "", tcmr.genes)
+    
+    new.ge <- new.ns.norm
+    new.ge <- data.frame(t(new.ge), check.names=FALSE)
+    new.ge <- new.ge[,colnames(new.ge) %in% tcmr.genes]
+    
+    ## base model predictions
+    tcmr.glm.preds <- predict(tcmr.glm.model, newdata = new.ge, type='prob')
+    tcmr.glmnet.preds <- predict(tcmr.glmnet.model, newdata = new.ge, type='prob')
+    tcmr.lda.preds <- predict(tcmr.lda.model, newdata = new.ge, type='prob')
+    tcmr.svmlinear.preds <- predict(tcmr.svmlinear.model, newdata = new.ge, type='prob')
+    tcmr.svmradial.preds <- predict(tcmr.svmradial.model, newdata = new.ge, type='prob')
+    
+    colnames(tcmr.glm.preds) <- paste0(colnames(tcmr.glm.preds), ".glm")
+    colnames(tcmr.glmnet.preds) <- paste0(colnames(tcmr.glmnet.preds), ".glmnet")
+    colnames(tcmr.lda.preds) <- paste0(colnames(tcmr.lda.preds), ".lda")
+    colnames(tcmr.svmlinear.preds) <- paste0(colnames(tcmr.svmlinear.preds), ".svmlinear")
+    colnames(tcmr.svmradial.preds) <- paste0(colnames(tcmr.svmradial.preds), ".svmradial")
+   
+    tcmr.all.preds <- cbind(tcmr.glm.preds, tcmr.glmnet.preds, tcmr.lda.preds, tcmr.svmlinear.preds, tcmr.svmradial.preds)
+    tcmr.all.preds <- tcmr.all.preds[,grep("tcmr", colnames(tcmr.all.preds))]
+    
+    ##--------------------------
+    ## Non-rejection (normal) base models
+    normal.genes <- names(coef(normal.glm.model$finalModel))
+    normal.genes <- normal.genes[grep("Intercept", normal.genes, invert=TRUE)]
+    normal.genes <- gsub("`", "", normal.genes)
+    
+    new.ge <- new.ns.norm
+    new.ge <- data.frame(t(new.ge), check.names=FALSE)
+    new.ge <- new.ge[,colnames(new.ge) %in% normal.genes]
+    
+    ## base model predictions
+    normal.glm.preds <- predict(normal.glm.model, newdata = new.ge, type='prob')
+    normal.glmnet.preds <- predict(normal.glmnet.model, newdata = new.ge, type='prob')
+    normal.lda.preds <- predict(normal.lda.model, newdata = new.ge, type='prob')
+    normal.svmlinear.preds <- predict(normal.svmlinear.model, newdata = new.ge, type='prob')
+    normal.svmradial.preds <- predict(normal.svmradial.model, newdata = new.ge, type='prob')
+    
+    colnames(normal.glm.preds) <- paste0(colnames(normal.glm.preds), ".glm")
+    colnames(normal.glmnet.preds) <- paste0(colnames(normal.glmnet.preds), ".glmnet")
+    colnames(normal.lda.preds) <- paste0(colnames(normal.lda.preds), ".lda")
+    colnames(normal.svmlinear.preds) <- paste0(colnames(normal.svmlinear.preds), ".svmlinear")
+    colnames(normal.svmradial.preds) <- paste0(colnames(normal.svmradial.preds), ".svmradial")
+    
+    normal.all.preds <- cbind(normal.glm.preds, normal.glmnet.preds, normal.lda.preds, normal.svmlinear.preds, normal.svmradial.preds)
+    normal.all.preds <- normal.all.preds[,grep("normal", colnames(normal.all.preds))]
+    
+    ##-----------
+    ## combine amr, tcmr, normal base predictions
+    all.preds <- cbind(amr.all.preds, tcmr.all.preds, normal.all.preds)
     all.preds$ID <- rownames(all.preds)
     
     ## Calculate median score across base models + medianCIs
@@ -615,22 +676,11 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     normal.preds$lwr.ci[normal.preds$lwr.ci<0]<-0
     normal.preds$upr.ci[normal.preds$upr.ci>1]<-1
     
-    ## other=NRKI: non-rejection kidney injury
-    other.preds <- all.preds[,grep("other", colnames(all.preds))]
-    other.preds[] <- lapply(other.preds[], as.numeric)
-    other_ci <- apply(other.preds, 1, function(x) { DescTools::MedianCI(x, conf.level=0.95, method="boot") })
-    other.preds$median <- other_ci[1,] #ensemble score
-    other.preds$lwr.ci <- other_ci[2,]
-    other.preds$upr.ci <- other_ci[3,]
-    other.preds$lwr.ci[other.preds$lwr.ci<0]<-0
-    other.preds$upr.ci[other.preds$upr.ci>1]<-1
-    
     ## ensemble predictions + confidence intervals
     ensemble.preds <- data.frame(ID=rownames(amr.preds),
     			     amr=amr.preds$median, amr_lwr_ci=amr.preds$lwr.ci, amr_upr_ci=amr.preds$upr.ci,
     			     tcmr=tcmr.preds$median, tcmr_lwr_ci=tcmr.preds$lwr.ci, tcmr_upr_ci=tcmr.preds$upr.ci,
-    			     normal=normal.preds$median, normal_lwr_ci=normal.preds$lwr.ci, normal_upr_ci=normal.preds$upr.ci,
-    			     other=other.preds$median, other_lwr_ci=other.preds$lwr.ci, other_upr_ci=other.preds$upr.ci)
+    			     normal=normal.preds$median, normal_lwr_ci=normal.preds$lwr.ci, normal_upr_ci=normal.preds$upr.ci)
     rownames(ensemble.preds) <- ensemble.preds$ID
     
     new.dx.pred <- ensemble.preds 
@@ -722,36 +772,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     colnames(new.ct1.pred) <- c("ct1_binary", "ID")
 
     ##--------------------------
-    ## predict prob cv>1 for new sample(s)
-    cv1.genes <- names(cv1_score.model$coefficients)[-1] #LR
-
-    new.cv <- t(new.ge)
-    new.cv <- new.cv[,colnames(new.cv) %in% cv1.genes]
-
-    new.pred <- stats::predict(cv1_score.model, newdata=data.frame(t(new.cv)), type="response") #LR
-
-    new.pred <- data.frame(new.pred)
-    new.pred$ID <- newID
-    new.pred$low <- NULL
-    new.cv1.pred <- new.pred
-    colnames(new.cv1.pred) <- c("cv1_binary", "ID")
-
-    ##--------------------------
-    ## predict prob v>0 for new sample(s)
-    v0.genes <- names(v0_score.model$coefficients)[-1] #LR
-
-    new.v <- t(new.ge)
-    new.v <- new.v[,colnames(new.v) %in% v0.genes]
-
-    new.pred <- stats::predict(v0_score.model, newdata=data.frame(t(new.v)), type="response") #LR
-
-    new.pred <- data.frame(new.pred)
-    new.pred$ID <- newID
-    new.pred$low <- NULL
-    new.v0.pred <- new.pred
-    colnames(new.v0.pred) <- c("v0_binary", "ID")
-
-    ##--------------------------
     ## predict prob cg>0 for new samples
     cg0.genes <- names(cg0_score.model$coefficients)[-1] #LR
 
@@ -786,8 +806,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     options(scipen = 999)
     join_list <- list(new.dx.pred,
     		      new.g.pred, new.ptc.pred, new.i.pred, new.t.pred, #ordinal
-                      new.cg0.pred, new.iifta0.pred, new.v0.pred,
-                      new.cv1.pred, new.ci1.pred, new.ct1.pred)
+                      new.cg0.pred, new.iifta0.pred, new.ci1.pred, new.ct1.pred)
     tab <- Reduce(function(...) merge(..., all=TRUE), join_list)
     rownames(tab) <- tab$ID
     
@@ -805,23 +824,20 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##-----------------------
     ## output IQR and median scores by Dx for reference biopsies
+    ref.tab <- dx_ref
+    dx_scores <- c("amr", "tcmr", "normal")
+    #dx_scores <- c("amr", "tcmr", "normal", "iifta0_binary", "cg0_binary", "ti1_binary", "ci1_binary", "ct1_binary")
     
     ## add binary Banff lesion scores
-    ref.tab <- merge(dx_ref, banff_ref[,c("ID", "iifta0_binary", "v0_binary", "cg0_binary", "ti1_binary", "cv1_binary", 
-    				      "ci1_binary", "ct1_binary")], by="ID")
-    rownames(ref.tab) <- ref.tab$ID
-    
-    dx_scores <- c("amr", "tcmr", "normal", "other", "iifta0_binary", "v0_binary", "cg0_binary", "ti1_binary", "cv1_binary", 
-    	       "ci1_binary", "ct1_binary")
+    #ref.tab <- merge(ref.tab, banff_ref[,c("ID", "iifta0_binary", "cg0_binary", "ti1_binary", "ci1_binary", "ct1_binary")], by="ID")
+    #rownames(ref.tab) <- ref.tab$ID
     #ref.tab <- ref.tab[apply(ref.tab[,-1], 1, function(x) { all(!is.na(x)) }),] #exclude samples without all molecular scores
     
-    ## IQR = Q3 - Q1
-    ## Q0= min and Q5=max
+    ## IQR = Q3 - Q1 (Q0= min and Q5=max)
     ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="amr",dx_scores], 2, quantile, na.rm=TRUE)
     ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="tcmr",dx_scores], 2, quantile, na.rm=TRUE)
     ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="normal",dx_scores], 2, quantile, na.rm=TRUE)
-    ref.other.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="other",dx_scores], 2, quantile, na.rm=TRUE)
-    
+
     ref.amr.quantiles <- data.frame(apply(ref.amr.quantiles, 2, function(x) {round(x, 3)*100}))
     ref.amr.quantiles$Dx <- "AMR"
     ref.amr.quantiles$Q <- rownames(ref.amr.quantiles)
@@ -833,12 +849,8 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ref.normal.quantiles <- data.frame(apply(ref.normal.quantiles, 2, function(x) {round(x, 3)*100}))
     ref.normal.quantiles$Dx <- "NONREJECTION"
     ref.normal.quantiles$Q <- rownames(ref.normal.quantiles)
-    
-    ref.other.quantiles <- data.frame(apply(ref.other.quantiles, 2, function(x) {round(x, 3)*100}))
-    ref.other.quantiles$Dx <- "NRKI"
-    ref.other.quantiles$Q <- rownames(ref.other.quantiles)
 
-    ref.score.quantiles <- rbind(ref.amr.quantiles, ref.tcmr.quantiles, ref.normal.quantiles, ref.other.quantiles)
+    ref.score.quantiles <- rbind(ref.amr.quantiles, ref.tcmr.quantiles, ref.normal.quantiles)
     
     ##----------------------------------------------
     ## boxplots of reference biopsy molecular scores
@@ -856,6 +868,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     	ggtitle("AMR reference biopsies") +
     	ylab("molecular score (%)") + xlab("") + ylim(c(0, 100)) +
     	geom_hline(yintercept=50, linetype="dashed", color="slategray") +
+    	#geom_violin(color="steelblue4", fill="whitesmoke") +
     	geom_boxplot(color="steelblue4", fill="whitesmoke") +
     	theme(legend.title=element_blank(),
     	      panel.grid.minor=element_line(colour="gray"),
@@ -873,8 +886,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## combine refset and new molecular scores
     ## scores to input to PCA
     pca_scores <- c("amr", "tcmr", "normal")
-    #pca_scores <- c("g0", "g1", "g2", "g3", "ptc0", "ptc1", "ptc2", "ptc3",
-    #                "i0", "i1", "i2", "i3", "t0", "t1", "t2", "t3")
 
     ## keep only Bx with all molecular scores
     mscores_pca <- ref.tab[apply(ref.tab[,pca_scores], 1, function(x) { all(!is.na(x)) }),]
@@ -898,7 +909,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     #col_vector=c("firebrick",  "blue3", "mediumpurple", "turquoise", "orangered", "dodgerblue", "salmon",
     #	     "olivedrab2","darkgreen", "black", "palegreen", "lightgray")
-    col_vector=c("firebrick",  "blue3", "salmon", "dodgerblue", "orangered", "black", "lightgray", "gray36")
+    col_vector=c("firebrick",  "blue3", "salmon", "dodgerblue", "orangered", "black", "lightgray", "gray18")
     	     
     pca_new_1_2 <- ggplot() +
         scale_fill_manual(values=col_vector) +
@@ -979,28 +990,28 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     ##----------------
     ## banff scores of nearest neighbors
-    banff_df <- merge(nn_df, banff_ref[,c("ID", "g_score", "ptc_score", "cg_score", "i_score", "t_score", "v_score")], by="ID")
-
-    g_df <- data.frame(g=table(banff_df$g_score, useNA="no"))
-    ptc_df <- data.frame(ptc=table(banff_df$ptc_score, useNA="no"))
-    cg_df <- data.frame(cg=table(banff_df$cg_score, useNA="no"))
-    i_df <- data.frame(i=table(banff_df$i_score, useNA="no"))
-    t_df <- data.frame(t=table(banff_df$t_score, useNA="no"))
-    v_df <- data.frame(v=table(banff_df$v_score, useNA="no"))
-
-    score_df <- data.frame(score=c("0", "1", "2", "3"))
-    score_df <- merge(score_df, g_df, by.x="score", by.y="g.Var1", all=TRUE)
-    score_df <- merge(score_df, ptc_df, by.x="score", by.y="ptc.Var1", all=TRUE)
-    score_df <- merge(score_df, cg_df, by.x="score", by.y="cg.Var1", all=TRUE)
-    score_df <- merge(score_df, i_df, by.x="score", by.y="i.Var1", all=TRUE)
-    score_df <- merge(score_df, t_df, by.x="score", by.y="t.Var1", all=TRUE)
-    score_df <- merge(score_df, v_df, by.x="score", by.y="v.Var1", all=TRUE)
-
-    score_df[is.na(score_df)]<-0
-
-    rownames(score_df) <- score_df$score
-    nn_banff <- data.frame(round(apply(score_df[,-1], 2, function(x) {x/sum(x)*100}), 0), check.names=F) #% of Bx with given score by lesion
-    colnames(nn_banff) <- gsub(".Freq", "", colnames(nn_banff))
+    # banff_df <- merge(nn_df, banff_ref[,c("ID", "g_score", "ptc_score", "cg_score", "i_score", "t_score", "v_score")], by="ID")
+    # 
+    # g_df <- data.frame(g=table(banff_df$g_score, useNA="no"))
+    # ptc_df <- data.frame(ptc=table(banff_df$ptc_score, useNA="no"))
+    # cg_df <- data.frame(cg=table(banff_df$cg_score, useNA="no"))
+    # i_df <- data.frame(i=table(banff_df$i_score, useNA="no"))
+    # t_df <- data.frame(t=table(banff_df$t_score, useNA="no"))
+    # v_df <- data.frame(v=table(banff_df$v_score, useNA="no"))
+    # 
+    # score_df <- data.frame(score=c("0", "1", "2", "3"))
+    # score_df <- merge(score_df, g_df, by.x="score", by.y="g.Var1", all=TRUE)
+    # score_df <- merge(score_df, ptc_df, by.x="score", by.y="ptc.Var1", all=TRUE)
+    # score_df <- merge(score_df, cg_df, by.x="score", by.y="cg.Var1", all=TRUE)
+    # score_df <- merge(score_df, i_df, by.x="score", by.y="i.Var1", all=TRUE)
+    # score_df <- merge(score_df, t_df, by.x="score", by.y="t.Var1", all=TRUE)
+    # score_df <- merge(score_df, v_df, by.x="score", by.y="v.Var1", all=TRUE)
+    # 
+    # score_df[is.na(score_df)]<-0
+    # 
+    # rownames(score_df) <- score_df$score
+    # nn_banff <- data.frame(round(apply(score_df[,-1], 2, function(x) {x/sum(x)*100}), 0), check.names=F) #% of Bx with given score by lesion
+    # colnames(nn_banff) <- gsub(".Freq", "", colnames(nn_banff))
 
     ##----------------
     ## mean molecular score of nearest neighbors
@@ -1025,6 +1036,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     rownames(pred_aa) <- newID
     pred_aa <- round(pred_aa * 100, 3)
     
+    new_scores <- cbind(new_scores, pred_aa)
     new_scores$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
     new_scores$Dx <- "new"
     new_scores$Dx_simple <- "new"
@@ -1036,7 +1048,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
 
     pca.aa[pca.aa$ref=="new",]
 
-    aa_cols=c("black", "firebrick", "lightgray", "blue3", "#009E73")
+    aa_cols=c("black", "firebrick", "blue3", "lightgray", "#009E73")
 
     pca_aa <- ggplot() +
         scale_fill_manual(values=aa_cols) +
@@ -1072,6 +1084,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
               axis.title.x=element_text(face="bold", size=12, angle=0),
               axis.title.y=element_text(face="bold", size=12),
               panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+   
     ##---------------
     ## Dx by cluster
     ## banff score by cluster
@@ -1109,7 +1122,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     return(list(new_scores=new_scores_pct,
               ref_scores=ref.score.quantiles,
               knn_dx=nn_dx,
-              knn_banff=nn_banff,
+              #knn_banff=nn_banff,
               pca_1_2=pca_new_1_2,
               pca_2_3=pca_new_2_3,
               aa_cluster_new=pred_aa, #new sample cluster probs

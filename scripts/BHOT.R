@@ -1,7 +1,7 @@
 ## THIS IS THE MASTER SCRIPT (~/Dropbox/PTG/transcriptomics/nanostring/scripts/BHOTR/scripts/)
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "rjson", "NormqPCR", "smotefamily", "stringr")
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "ModelMetrics", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
 missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 #BiocManager::install("RUVSeq")
@@ -38,26 +38,37 @@ modelEval <- function(true_values, predicted_values, threshold=NULL, print.resul
 	roc <- pROC::roc(true_values, predicted_values, quiet=TRUE)
 	
 	result = list()
-	result$AUC <- round(100*as.numeric(ci(roc, of="auc"))[2], 3)
-	result$brier_score <-round(100*DescTools::BrierScore(true_values, predicted_values), 3)
-	result$log_loss <- round(MLmetrics::LogLoss(true_values, predicted_values), 3)
-	
+	result$brier_score <-round(DescTools::BrierScore(true_values, predicted_values), 3)
+	result$log_loss <- round(MLmetrics::LogLoss(true_values, predicted_values) / 100, 3)
+		
 	pred_tab <- data.frame(truth=true_values, predicted=predicted_values)
-	result$PRAUC <- round(100*PRROC::pr.curve(pred_tab[pred_tab$truth==1,"predicted"], pred_tab[pred_tab$truth==0,"predicted"], curve=TRUE)$auc.integral, 3)
+	result$PRAUC <- round(PRROC::pr.curve(pred_tab[pred_tab$truth==1,"predicted"], pred_tab[pred_tab$truth==0,"predicted"], curve=TRUE)$auc.integral, 3)
+
+	# the baseline in a PR curve is a horizontal line with height equal to the proportion of positive samples
+	# baseline to beat is the always-positive classifier rather than any random classifier
+	# Precision of a No-Skill model is equal to the fraction of positive class in the dataset
+	result$PR_base <- sum(true_values) / length(true_values)
+	# compare PRAUC to chance precision baseline (ie. rather than 0.5)
+	#result$PRAUC / result$PRAUC_base 
 	
+	result$ROCAUC <- round(as.numeric(ci(roc, of="auc"))[2], 3)
+	result$ROCAUC_CI_low <- round(as.numeric(ci(roc, of="auc"))[1], 3)
+	result$ROCAUC_CI_high <- round(as.numeric(ci(roc, of="auc"))[3], 3)
 	
-	if (exists('threshold')) {
-		predicted_outcomes <- ifelse(predicted_values > threshold, 1, 0)
-		result$youden <- threshold
-	} else {
+	## assign class labels based on specified or Youden threshold
+	if (is.null(threshold)) {
+		cat("Calculating Youden threshold")
 		roc_coords <- coords(roc, x="best", input="threshold", best.method="youden", transpose=F)
 		predicted_outcomes <- ifelse(predicted_values > roc_coords$threshold, 1, 0)
-		result$youden <- round(roc_coords$threshold, 3)	
+		result$threshold <- round(roc_coords$threshold, 3)
+	} else {
+		predicted_outcomes <- ifelse(predicted_values > threshold, 1, 0)
+		result$threshold <- threshold
 	}
 
-	result$CI_low <- round(100*as.numeric(ci(roc, of="auc"))[1], 3)
-	result$CI_high <- round(100*as.numeric(ci(roc, of="auc"))[3], 3)
-	result$accuracy = sum(true_values==predicted_outcomes)*100/length(true_values)
+	# –1 = perfect misclassification and +1 = perfect classification
+	result$MCC <- round(ModelMetrics::mcc(true_values, predicted_values, cutoff=result$threshold), 3)
+	result$accuracy = round(sum(true_values==predicted_outcomes)/length(true_values), 3)
 	
 	if ( print.results ) {
 		cat("Total cases that are not NA: ",length(true_values),"\n",sep="")
@@ -71,53 +82,85 @@ modelEval <- function(true_values, predicted_values, threshold=NULL, print.resul
 	FN = sum(true_values==1 & predicted_outcomes==0)
 	P = TP+FN
 	N = FP+TN
-	precision=TP/(TP+FP)
-	recall=TP/(TP+FN)
-	result$PPV = 100*TP/(TP+FP)
-	result$TPR = 100*TP/P
-	result$TNR = 100*TN/N
-	result$FDR = 100*FP/(TP+FP)
-	result$FPR = 100*FP/N
-	result$balanced_accuracy = (result$TPR + result$TNR)/2 #balanced accuracy
-	result$F1 = 2*((precision*recall)/(precision+recall))*100 #harmonic mean
+	precision = signif(TP/(TP+FP), 3)
+	recall = signif(TP/(TP+FN), 3)
+	result$PPV = signif(TP/(TP+FP), 3)
+	result$TPR = signif(TP/P, 3)
+	result$TNR = signif(TN/N, 3)
+	result$FDR = signif(FP/(TP+FP), 3)
+	result$FPR = signif(FP/N, 3)
+	result$balanced_accuracy = signif((result$TPR + result$TNR)/2, 3) #balanced accuracy
+	result$F1 = signif(2*((precision*recall)/(precision+recall)), 3) #harmonic mean
 	
 	if ( print.results ) {
-		cat("PPV: (precision)=TP/(TP+FP)= ", signif(result$PPV,3),"%\n",sep="")
-		cat("TPR: (sensitivity)=TP/(TP+FN)= ", signif(result$TPR,3),"%\n",sep="")
-		cat("TNR: (specificity)=TN/(TN+FP)= ", signif(result$TNR,3),"%\n",sep="")
-		cat("FDR: (false discovery)=1-PPV= ", signif(result$FDR,3),"%\n",sep="")
-		cat("FPR: FP/N=1-TNR= ", signif(result$FPR,3),"%\n",sep="")
-		cat("F1: 2(PPV*TPR)/(PPV+TPR)= ", signif(result$F1,3),"%\n",sep="")
+		cat("PPV: (precision)=TP/(TP+FP)= ", result$PPV,"%\n",sep="")
+		cat("TPR: (sensitivity)=TP/(TP+FN)= ", result$TPR,"%\n",sep="")
+		cat("TNR: (specificity)=TN/(TN+FP)= ", result$TNR,"%\n",sep="")
+		cat("FDR: (false discovery)=1-PPV= ", result$FDR,"%\n",sep="")
+		cat("FPR: FP/N=1-TNR= ", result$FPR,"%\n",sep="")
+		cat("F1: 2(PPV*TPR)/(PPV+TPR)= ", result$F1,"%\n",sep="")
 	}
 	#if ( print.results ) { invisible(result) }
-	#else { return(data.frame(result)) }
-	
 	return(data.frame(result))
 }
 
 ##-------------------------------------------------
 ## plot score cutoff versus TPR, TNR, Accuracy, F1
 plotPrediction <- function(truth, predicted, threshold) {
-    
-    cutoffs <- data.frame(matrix(nrow=length(seq(0.1,1, 0.1)), ncol=5))
-    colnames(cutoffs) <- c("cutoff", "TPR", "TNR", "Accuracy", "F1")
-    cutoffs$cutoff <- seq(0.1,1, 0.1)
-    
-    for (i in 1:nrow(cutoffs)) {
-        cutpoint <- cutoffs$cutoff[i]
-        cutoffs[i,"TPR"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$TPR
-        cutoffs[i,"TNR"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$TNR
-        cutoffs[i,"Accuracy"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$accuracy
-        cutoffs[i,"F1"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$F1
-    }
-    
-    plot(cutoffs$cutoff, cutoffs$TPR, col="blue", type="l", lty=4, lwd=2, xlab="score cutoff", ylab="")
-    lines(cutoffs$cutoff, cutoffs$TNR, col="red", lty=4, lwd=2)
-    lines(cutoffs$cutoff, cutoffs$Accuracy, col="black", lty=3, lwd=2)
-    lines(cutoffs$cutoff, cutoffs$F1, col="purple", lty=4, lwd=2)
-    abline(v=threshold, col="gray", lty=4, lwd=1.5)
-    legend(0.5, 0.2, legend = c("TPR", "TNR", "Accuracy", "F1"), col = c("blue", "red", "black", "purple"), 
-           lty=4, bty = "o", pt.cex=2, lwd=2, cex=0.8, text.col = "black")
+	
+	cutoffs <- data.frame(matrix(nrow=length(seq(0.1,1, 0.1)), ncol=5))
+	colnames(cutoffs) <- c("cutoff", "TPR", "TNR", "Accuracy", "F1")
+	cutoffs$cutoff <- seq(0.1,1, 0.1)
+	
+	for (i in 1:nrow(cutoffs)) {
+		cutpoint <- cutoffs$cutoff[i]
+		cutoffs[i,"TPR"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$TPR
+		cutoffs[i,"TNR"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$TNR
+		cutoffs[i,"Accuracy"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$accuracy
+		cutoffs[i,"F1"] <- modelEval(truth, predicted, threshold=cutpoint, print.results=F)$F1
+	}
+	
+	plot(cutoffs$cutoff, cutoffs$TPR, col="blue", type="l", lty=4, lwd=2, xlab="score cutoff", ylab="")
+	lines(cutoffs$cutoff, cutoffs$TNR, col="red", lty=4, lwd=2)
+	lines(cutoffs$cutoff, cutoffs$Accuracy, col="black", lty=3, lwd=2)
+	lines(cutoffs$cutoff, cutoffs$F1, col="purple", lty=4, lwd=2)
+	abline(v=threshold, col="gray", lty=4, lwd=1.5)
+	legend(0.5, 0.2, legend = c("TPR", "TNR", "Accuracy", "F1"), col = c("blue", "red", "black", "purple"), 
+	       lty=4, bty = "o", pt.cex=2, lwd=2, cex=0.8, text.col = "black")
+}
+
+##-------------------------------------------------
+## custom caret model tuning metrics; set summaryFunction=customSummary in trainControl
+customSummary <- function (data, lev = NULL, model = NULL) {
+	
+	pr_auc <- try(MLmetrics::PRAUC(data[, lev[2]],
+				       ifelse(data$obs == lev[2], 1, 0)), silent = TRUE)
+	brscore <- try(mean((data[, lev[2]] - ifelse(data$obs == lev[2], 1, 0)) ^ 2), silent = TRUE)
+	rocObject <- try(pROC::roc(ifelse(data$obs == lev[2], 1, 0), data[, lev[2]],
+				   direction = "<", quiet = TRUE), silent = TRUE)
+	if (inherits(pr_auc, "try-error")) pr_auc <- NA
+	if (inherits(brscore, "try-error")) brscore <- NA
+	rocAUC <- if (inherits(rocObject, "try-error")) {
+		NA
+	} else {
+		rocObject$auc
+	}
+	
+	tmp <- unlist(e1071::classAgreement(table(data$obs, data$pred)))[c("diag", "kappa")]
+	out <- c(Accuracy = tmp[[1]],
+		 Kappa = tmp[[2]],
+		 AUCROC = rocAUC,
+		 AUCPR = pr_auc,
+		 Brier = brscore,
+		 Precision = caret:::precision.default(data = data$pred,
+		 				      reference = data$obs,
+		 				      relevant = lev[2]),
+		 Recall = caret:::recall.default(data = data$pred,
+		 				reference = data$obs,
+		 				relevant = lev[2]),
+		 F = caret:::F_meas.default(data = data$pred, reference = data$obs,
+		 			   relevant = lev[2]))
+	out
 }
 
 ##------------------------------
@@ -148,7 +191,8 @@ importRCC <- function(rccFile) {
 	id_line <- samp_attr[grep("^ID", samp_attr$line),]
 	sampID <- do.call('rbind', strsplit(as.character(id_line$line), ','))[2]
 
-	all_attr <- rccFile[rccFile$tag!="Code_Summary",]
+	# exclud messages; causes import issues
+	all_attr <- rccFile[!rccFile$tag %in% c("Code_Summary", "Messages"),]
 
 	parse_attr <- data.frame(do.call('rbind', strsplit(as.character(all_attr$line), ',')), stringsAsFactors=FALSE)
 	parse_attr <- rbind(parse_attr, data.frame(X1="FileName", X2=file_name))
@@ -735,20 +779,26 @@ RUVnorm <- function(eset, k, method="RUVg", control_genes=NULL) {
     eset_filt <- newSeqExpressionSet(counts_filt, phenoData=pData(eset), featureData=fdat_filt)
     
     if(method=="RUVg") {
+    	
         ## RUVg using negative control genes (ie. genes assumed not to be DE with respect to the covariate of interest)
         cat("applying RUVg normalization\n")
     	eset_filt <- RUVg(eset_filt, c_idx, k=k, isLog=FALSE, round=TRUE)
+    	
     } else if(method=="RUVs") {
+    	
         ## RUVs: negative control samples for which covariates of interest are constant (eg. centered counts for technical replicates)
         #cat("applying RUVs normalization\n")
         #eset <- RUVs(eset, c_idx, k=k, isLog=FALSE, round=TRUE)
         cat("RUVs is not yet implemented")
+    	
     } else if(method=="RUVr") {
+    	
         ## RUVr: uses residuals from a first pass GLM regression of the unnormalized counts on covariates of interest
         #my.glm <- glm(assay(eset) ~ as.factor(group_labels)))
         #glm_res <- residuals(my.glm)
         #eset <- RUVs(eset, c_idx, k=k, residuals=glm_res, isLog=FALSE, round=TRUE)
         cat("RUVr is not yet implemented")
+    	
     } else {
         cat("Possible methods include c('RUVg', 'RUVs', 'RUVr')")
     }
@@ -799,8 +849,8 @@ RCRnorm <- function(counts) {
     
     #dput(as.numeric(gsub(".*\\((.*)\\).*", "\\1", ns.anno[ns.anno$CodeClass=="Positive","Name"])))
     
-    rcr.norm <- RCRnorm(ns.data.rcr, pos_conc=log10(c(128, 32, 8, 2, 0.5, 0.125)),
-                        fast_method=FALSE, iter=10000, warmup=5000)
+    rcr.norm <- RCRnorm::RCRnorm(ns.data.rcr, pos_conc=log10(c(128, 32, 8, 2, 0.5, 0.125)),
+                        fast_method=FALSE, iter=8000, warmup=5000)
     
     return(rcr.norm)
     
@@ -879,7 +929,7 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
     ## label top genes by pvalue or logFC
     gp_volcano <- ggplot() + ylab("-log10(pval)") + xlab("log2FC") + ggtitle(plot_title) +
         #geom_point(data=df.fit, aes( x=log2FoldChange, y=logP), colour="slategray", size=3, alpha=0.7) +
-        geom_point(data=df.fit, aes(x=log2FoldChange, y=logP, color=sig), shape=19, size=3, alpha=0.7) +
+        geom_point(data=df.fit, aes(x=log2FoldChange, y=logP, color=sig), shape=19, size=4, alpha=0.7) +
         geom_text_repel(data=head(df.fit, num_genes), aes(x=log2FoldChange, y=logP, label=gene), colour="gray", size=3) +
         scale_color_manual(values=c("steelblue", "salmon")) + 
         geom_vline(xintercept=0, linetype="dashed", size=0.4) +
@@ -887,10 +937,9 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
         theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
               panel.background=element_blank(), axis.line=element_line(colour="black"),
               panel.border=element_rect(colour="black", fill=NA, size=1),
-              plot.title = element_text(size=12, face = "bold"), legend.position="none",
-              axis.text=element_text(size=12, family="sans", colour="black"), 
-              axis.title.x=element_text(size=12, family="sans", colour="black"), 
-              axis.title.y=element_text(size=12, family="sans", colour="black"))
+              plot.title = element_text(size=14, face = "bold"), legend.position="none",
+              axis.text=element_text(size=14, family="sans", colour="black"), 
+              axis.title=element_text(size=14, family="sans", colour="black", face="bold"))
     
     df.fit[df.fit$gene %in% c("CCL4", "CXCL11", "CXCL10", "PLA1A", "GNLY", "ROBO4", "FGFBP2",
                               "SH2D1B", "CD160", "DARC", "ROBO4", "CDH5", "CDH13", "SOST"),] #AMR
