@@ -124,6 +124,7 @@ if(nrow(pt_df) %% 2 == 0) {
 }
 
 ```
+</div>
 
 ***
 ## Gene expression based probabilities:
@@ -199,14 +200,15 @@ Diagnosis based scores represent the probability (0-100%) that a biopsy has an e
 
 ***
 ## Principal Components Analysis (PCA) of molecular scores:
-<div style="margin-bottom:40px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Samples are labeled by histologic diagnosis (NRKI=non-rejection kidney injury). The tested sample is the yellow diamond.'}
+<div style="margin-bottom:50px;">
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap=''}
 
 #gridExtra::grid.arrange(newPreds$pca_1_2, newPreds$pca_2_3, ncol=2)
 newPreds$pca_1_2
 #newPreds$pca_2_3
 
 ```
+Samples are labeled by histologic diagnosis (NRKI=non-rejection kidney injury). The tested sample is the yellow diamond.
 </div>
 
 ***
@@ -334,7 +336,7 @@ FoV=fields of view | geo mean=geometric mean | LoD=limit of detection | PCL=posi
 __Recommended QC thresholds:__  
 Registered FoVs >75% | PCL >0.95 | Binding Density 0.05-2.25 | 80% ENDO genes >LoD | POS_E counts >LoD  
 
-### For research use only
+### For research use only:
 Models have been not been validated in clinical settings or trials. This report does not replace a standard diagnosis. Due to known technical variation, RNA later-fixed samples should be interpreted with caution.
 
 ```{r, echo=FALSE, include=TRUE}
