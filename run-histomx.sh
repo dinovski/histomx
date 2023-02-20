@@ -17,7 +17,8 @@ $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/tcmr.RCC -i 'tcmr-test'
 
 $HISTOMX -m ${RMD_FILE} -f ~/Dropbox/PTG/transcriptomics/nanostring/kidney/beta-testing/KTD1-RNAlater-run-3/RCC/20201215_KTD1-RNAlater-run-3_NG-1738_05.RCC -i "NG-1738" -p ~/Desktop/patient-test.txt
 
-$HISTOMX -m ${RMD_FILE} -f ~/Downloads/20200618_IIFTA-run-6_IF-62_07.RCC -i "IF-62"
+$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/20210401_RefSet-run-30_NS-413_11.RCC -i "NS-413" -p ${HISTOMX_PATH}/test_files/ns-413-patient.txt 
+$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/20210804_RefSet-run-60_NS-748_12.RCC -i "NS-748" -p ${HISTOMX_PATH}/test_files/ns-748-patient.txt 
 
 ##--------------
 ## NS-344: Active AMR: g3, ptc3, v3, i0, t0, C4d3
@@ -57,4 +58,13 @@ done
 ## clone specific commit
 git checkout <commit_sha>
 
+## xeno
+IDIR=~/Dropbox/PTG/transcriptomics/nanostring/kidney/xeno/RCCs/
 
+$HISTOMX -m ${RMD_FILE} -f ${IDIR}/20211224_RefSet-Run-70_NP-01_01.RCC -p ${IDIR}/patient_info_NP-01.txt -r ${IDIR}/rna_info_NP-01.txt
+$HISTOMX -m ${RMD_FILE} -f ${IDIR}/20211224_RefSet-Run-70_NP-02_02.RCC -p ${IDIR}/patient_info_NP-02.txt -r ${IDIR}/rna_info_NP-02.txt
+
+$HISTOMX -m ${RMD_FILE} -f ${IDIR}/20220301_Nano-Pig-run1_NP-03_07.RCC -p ${IDIR}/patient_info_NP-03.txt -r ${IDIR}/rna_info_NP-03.txt
+$HISTOMX -m ${RMD_FILE} -f ${IDIR}/20220301_Nano-Pig-run1_NP-07_11.RCC -p ${IDIR}/patient_info_NP-07.txt
+$HISTOMX -m ${RMD_FILE} -f ${IDIR}/20220301_Nano-Pig-run1_NP-08_12.RCC -p ${IDIR}/patient_info_NP-08.txt -r ${IDIR}/rna_info_NP-08.txt
+$HISTOMX -m ${RMD_FILE} -f ${IDIR}/20220422_KTD2-RNAlater-Run11_NP-09_10.RCC -p ${IDIR}/patient_info_NP-09.txt -r ${IDIR}/rna_info_NP-09.txt

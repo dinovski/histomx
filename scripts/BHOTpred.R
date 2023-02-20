@@ -4,6 +4,9 @@
 ## predict probability of rejection on new biopsy
 source('../scripts/BHOT.R')
 
+norm_method="combined" #RUV
+#norm_method="separate" #HK
+
 ##-----------------------------------------------------
 ## load models
 ##-----------------------------------------------------
@@ -154,56 +157,78 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     dir.create(paste0(outPath, newID), recursive=TRUE, showWarnings=FALSE)
     newOut=paste0(outPath, newID)
 
-    ##------------------
-    ## combine refset and new RCC into single count table
-    ## TODO: pre-parse reference data and save table > add new RCC to table
-    #RCCfiles <- c(refRCC, newRCC)
-    #ns.data <- parseRCC(RCCfiles)
-    #countTable <- ns.data$counts
-    #rownames(countTable) <- countTable$Name
-    ##------------------
+    cat(">>Normalizing raw count data: ", norm_method, "\n")
 
-    ## load raw count table, parse newRCC, and merge counts
-    ns.data <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
-    ns.new <- parseRCC(newRCC)
-    countTable <- merge(ns.data, ns.new$counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
-    rownames(countTable) <- countTable$Name
+    if (norm_method=="combined") {
 
-    ## rename newID if exists in refset sample names: rownames(dx_ref)
-    samp_ind <- grep(newID, colnames(countTable))
-    if (length(samp_ind) > 1) {
-    	colnames(countTable)[samp_ind][1]<-newID
-    	colnames(countTable)[samp_ind][2]<-paste0(newID, "-new")
-    	newID<-paste0(newID, "-new")
+    	## Normalize refset with new sample
+    	
+    	## load refset counts, parse newRCC, and merge counts
+    	ns.raw <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
+    	
+    	ns.new <- parseRCC(newRCC)
+    	countTable <- merge(ns.raw, ns.new$counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
+    	rownames(countTable) <- countTable$Name
+    	
+    	## rename newID if exists in refset sample names: rownames(dx_ref)
+    	samp_ind <- grep(newID, colnames(countTable))
+    	if (length(samp_ind) > 1) {
+    		colnames(countTable)[samp_ind][1]<-newID
+    		colnames(countTable)[samp_ind][2]<-paste0(newID, "-new")
+    		newID<-paste0(newID, "-new")
+    	}
+    	
+    	## expression matrix
+    	ns.counts <- as.matrix(countTable[,-c(1:3)])
+    	
+    	## feature data
+    	ns.anno <- countTable[,c(1:3)]
+    	rownames(ns.anno) <- ns.anno$Name
+    	
+    	## phenotype data
+    	pdat <- data.frame(ID=colnames(ns.counts), check.names=FALSE)
+    	pdat <- merge(pdat, exp_design, by="ID", all.x=TRUE, sort=FALSE)
+    	rownames(pdat) <- pdat$ID
+    	
+    	## eset
+    	pdat <- AnnotatedDataFrame(data=pdat,)
+    	fdat <- AnnotatedDataFrame(data=ns.anno)
+    	eset <- newSeqExpressionSet(ns.counts, phenoData=pdat, featureData=fdat)
+    	
+    	##--------------
+    	## RUV normalization with refset
+    	ruv_norm <- RUVnorm(eset, k=2, method="RUVg")
+    	ns.norm <- data.frame(assay(ruv_norm$vsd), check.names=FALSE) ## normalized endogenous counts
+    	
+    	new.ns.norm <- data.frame(counts=ns.norm[,newID], check.names=FALSE)
+    	colnames(new.ns.norm) <- newID
+    	rownames(new.ns.norm) <- rownames(ns.norm)
+    	
+    } else {
+    	
+    	## normalized refset count
+    	ns.norm <- read.table('../model_data/kidney/tables/refset_counts_norm.txt', sep='\t', header=TRUE, check.names=FALSE)
+    	rownames(ns.norm) <- ns.norm$ID
+    	ns.norm$ID <- NULL
+    	ns.norm <- data.frame(t(ns.norm), check.names=F)
+    	
+    	## normalize new sample separately
+    	ns.new <- parseRCC(newRCC)
+    	raw_counts <- ns.new$counts
+    	colnames(raw_counts)[colnames(raw_counts)=="CodeClass"]<-"Code.Class"
+    	ns.new.hk <- nanostringr::HKnorm(raw_counts)
+    	ns.new.hk <- ns.new.hk[ns.new.hk$Code.Class=="Endogenous",]
+    	ns.new.hk <- ns.new.hk[order(ns.new.hk$Name),]
+    	new.ns.norm <- data.frame(ns.new.hk[,-c(1:3)], check.names=F)
+    	colnames(new.ns.norm) <- colnames(ns.new.hk)[4]
+    	rownames(new.ns.norm) <- rownames(ns.new.hk)
+    	
+    	## combine refset and new norm counts
+    	#all(rownames(ns.norm)==rownames(new.ns.norm))
+    	ns.norm <- cbind(ns.norm, new.ns.norm)
     }
-
-    ##------------------------
-    ## Normalize refset with new sample
     
-    ## expression matrix
-    ns.counts <- as.matrix(countTable[,-c(1:3)])
-    
-    ## feature data
-    ns.anno <- countTable[,c(1:3)]
-    rownames(ns.anno) <- ns.anno$Name
-    
-    ## phenotype data
-    pdat <- data.frame(ID=colnames(ns.counts), check.names=FALSE)
-    pdat <- merge(pdat, exp_design, by="ID", all.x=TRUE, sort=FALSE)
-    rownames(pdat) <- pdat$ID
-    
-    ## eset
-    pdat <- AnnotatedDataFrame(data=pdat,)
-    fdat <- AnnotatedDataFrame(data=ns.anno)
-    eset <- newSeqExpressionSet(ns.counts, phenoData=pdat, featureData=fdat)
-    
-    cat(">>Normalizing raw count data", "\n")
-    
-    ## RUV normalization
-    ruv_norm <- RUVnorm(eset, k=2, method="RUVg")
-    ns.norm <- assay(ruv_norm$vsd) ## normalized endogenous counts
-    #ns.raw <- counts(ruv_norm$eset)[rownames(counts(ruv_norm$eset)) %in% endo_genes,]
-    
+    ##--------------
     ## NanoString norm
     #x <- countTable[,!colnames(countTable) %in% c("CodeClass", "Name", "Accession")]
     ## multiply normalization factor by raw counts
@@ -211,19 +236,17 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     ## SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
     ## Normalize by substracting geometric mean of housekeeping genes from each endogenous gene
     #hk_genes=countTable[countTable$CodeClass=="Housekeeping","Name"]
-    ## calculate the normalization factor: arithmetic mean of the geometric means of positive controls
+    ## calculate normalization factor: arithmetic mean of the geometric means of positive controls
     #rna.content <- apply(x[rownames(x) %in% hk_genes,], MARGIN=2, FUN=geoMean);
     #hk.norm.factor <- mean(rna.content) / rna.content
     #x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
     #x.norm <- log2(x.norm + 1);
     ## return endogenous probes
     #ns.norm <- x.norm[rownames(x.norm) %in% countTable[countTable$CodeClass=="Endogenous","Name"],]
+    #new.ns.norm <- data.frame(counts=ns.norm[,newID], check.names=FALSE)
+    #colnames(new.ns.norm) <- newID
     ##------------------------
-
-    ## new sample(s) normalized with refSet
-    new.ns.norm <- data.frame(counts=ns.norm[,newID], check.names=FALSE)
-    colnames(new.ns.norm) <- newID
-
+    
     ##--------------------------
     ## BKV expression: new biopsy v. normal and BKV refset samples
     ##--------------------------
@@ -231,7 +254,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     norm_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% dx_normal,])
     bk_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% c("BK virus nephropathy"),])
 
-    bk_counts <- data.frame(ns.norm[,colnames(ns.norm) %in% c(norm_bx_ids, bk_bx_ids, newID)], check.names=FALSE)
+    bk_counts <- ns.norm[,colnames(ns.norm) %in% c(norm_bx_ids, bk_bx_ids, newID)]
     bk_counts <- bk_counts[rownames(bk_counts) %in% bk_genes,]
     rownames(bk_counts) <- gsub(".", "", rownames(bk_counts), fixed=TRUE)
 
@@ -260,7 +283,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     bkv_boxplot <- ggplot(dat.m, aes(x = forcats::fct_rev(group), y = value, fill=group)) + geom_boxplot() +
       xlab("") + ylab("normalized expression") +
       scale_fill_manual(values=c("navy",  "lightsteelblue", "orange")) +
-      theme(legend.position="none", panel.border=element_rect(colour="gray", fill=NA, size=1),
+      theme(legend.position="none", panel.border=element_rect(colour="gray", fill=NA, linewidth=1),
             axis.text=element_text(size=16, color="black"), axis.title=element_text(size=16, color="black"),
             panel.background=element_blank(), panel.grid.minor=element_line(colour="gray"))
 
@@ -493,7 +516,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
             #plot.background=element_rect(fill="white"),
             #panel.grid.minor=element_line(colour="gray"),
             panel.grid.major=element_line(colour="gray"),
-            panel.border=element_rect(colour=NA, fill=NA, size=5),
+            panel.border=element_rect(colour=NA, fill=NA, linewidth=5),
             legend.title = element_blank(),
             legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
             legend.position="right")
@@ -542,7 +565,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #   scale_colour_gradient2(limits = c(0, 1)) +
     #   theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
     #         panel.background=element_blank(), axis.line=element_line(colour="black"),
-    #         panel.border=element_rect(colour="black", fill=NA, size=1),
+    #         panel.border=element_rect(colour="black", fill=NA, linewidth=1),
     #         plot.title = element_text(size=12, face = "bold"),
     #         axis.text=element_text(size=12, family="sans", colour="black"),
     #         axis.title.x=element_text(size=12, family="sans", colour="black"),
@@ -556,7 +579,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     #   scale_colour_gradient2(limits = c(0, 1)) +
     #   theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
     #         panel.background=element_blank(), axis.line=element_line(colour="black"),
-    #         panel.border=element_rect(colour="black", fill=NA, size=1),
+    #         panel.border=element_rect(colour="black", fill=NA, linewidth=1),
     #         plot.title = element_text(size=12, face = "bold"),
     #         axis.text=element_text(size=12, family="sans", colour="black"),
     #         axis.title.x=element_text(size=12, family="sans", colour="black"),
@@ -879,7 +902,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     	      axis.title.x=element_text(face="bold", size=14, angle=0),
     	      axis.text.y=element_text(size=14, angle=0),
     	      axis.title.y=element_text(face="bold", size=14),
-    	      panel.border=element_rect(colour="gray", fill=NA, size=1))
+    	      panel.border=element_rect(colour="gray", fill=NA, linewidth=1))
     #ggsave(paste0(newOut, "/amr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_amr, device="pdf", width=8, height=6)
 
     ##--------------------------
@@ -927,7 +950,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
               axis.text.x=element_text(face="bold", size=12, angle=0),
               axis.title.x=element_text(face="bold", size=12, angle=0),
               axis.title.y=element_text(face="bold", size=12),
-              panel.border=element_rect(colour="white", fill=NA, size=5))
+              panel.border=element_rect(colour="white", fill=NA, linewidth=5))
 
     pca_new_2_3 <- ggplot() +
       scale_fill_manual(values=col_vector) +
@@ -943,7 +966,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
             axis.text.x=element_text(face="bold", size=12, angle=0),
             axis.title.x=element_text(face="bold", size=12, angle=0),
             axis.title.y=element_text(face="bold", size=12),
-            panel.border=element_rect(colour="white", fill=NA, size=5))
+            panel.border=element_rect(colour="white", fill=NA, linewidth=5))
 
     if (saveFiles=="TRUE") {
       ggsave(paste0(newOut, "/pca_dx_pc1_pc2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_new_1_2, device="pdf", width=7, height=6)
@@ -1066,7 +1089,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
               axis.text.x=element_text(size=12, angle=0),
               axis.title.x=element_text(face="bold", size=12, angle=0),
               axis.title.y=element_text(face="bold", size=12),
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+              panel.border=element_rect(colour="whitesmoke", fill=NA, linewidth=1))
 
     pca_aa_2_3 <- ggplot() +
         scale_fill_manual(values=aa_cols) +
@@ -1083,7 +1106,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
               axis.text.x=element_text(size=12, angle=0),
               axis.title.x=element_text(face="bold", size=12, angle=0),
               axis.title.y=element_text(face="bold", size=12),
-              panel.border=element_rect(colour="whitesmoke", fill=NA, size=1))
+              panel.border=element_rect(colour="whitesmoke", fill=NA, linewidth=1))
    
     ##---------------
     ## Dx by cluster

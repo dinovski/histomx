@@ -126,6 +126,8 @@ if(nrow(pt_df) %% 2 == 0) {
 ```
 </div>
 
+\newpage
+
 ***
 ## Gene expression based probabilities:
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
@@ -195,8 +197,6 @@ kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
 Diagnosis based scores represent the probability (0-100%) that a biopsy has an expression profile similar to reference samples with a given histology based rejection diagnosis (AMR or TCMR).  
 'Sample range' is the confidence interval for the predicted probabilities of the tested sample.  
 'Normal range' is the middle 50% of scores in biopsies with no rejection or injury diagnosis.
-
-\newpage
 
 ***
 ## Principal Components Analysis (PCA) of molecular scores:
