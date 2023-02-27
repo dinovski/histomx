@@ -85,25 +85,15 @@ if(!is.na(file.info(newPatient)$size)) {
 		jfile <- fromJSON(file=newPatient)
 		pt_df <- as.data.frame(jfile, check.names=F)
 	} else if (tools::file_ext(newPatient) == "txt") {
-		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"))
+		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"), encoding="UTF-8")
 	} else {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
-	
-	## if file contains no info, display empty data frame
-	if (empty(pt_df)==TRUE) {
-		
-		pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
-                        'Date of transplantation'=" ", 'Date of biopsy'=" ",
-                        'Biopsy indication'="    ", check.names=FALSE)
-		pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
-	} else {
-		## exclude empty cells
-		pt_df <- pt_df %>% filter_all(all_vars(!is.na(.)))
-	}
 
+	## exclude empty cells
+	pt_df <- pt_df %>% dplyr::filter_all(all_vars(!is.na(.)))
       
-} else {
+} else if (empty(pt_df)==TRUE) {
 	## if no file, display empty data frame
 	pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
                         'Report date'=Sys.Date(), check.names=FALSE)
@@ -211,6 +201,8 @@ newPreds$pca_1_2
 Samples are labeled by histologic diagnosis (NRKI=non-rejection kidney injury). The tested sample is the yellow diamond.
 </div>
 
+\newpage
+
 ***
 ### Histologic Diagnosis of 25 Nearest Neighbors
 ```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
@@ -222,8 +214,6 @@ kable(newPreds$knn_dx, row.names=FALSE, align='c', caption="", format="html") %>
     column_spec(1, bold=TRUE, background="white", color="black") %>%
     column_spec(c(2,3), bold=TRUE, color="dodgerblue", background="white")
 ```
-
-\newpage
 
 ***
 ### Clinician signout
@@ -262,6 +252,12 @@ if(!is.na(file.info(newRNA)$size)) {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
 
+	## auto-fill units if missing
+	if(!c("units") %in% rna_df[,1]) {
+		cat("Adding a column for units (ng/ul)")
+		rna_df <- rbind(rna_df, data.frame(V1="units", V2="ng/ul"))
+	}
+			
 	## transpose and use first column as header
 	if(nrow(rna_df) > 2) {
 		rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])

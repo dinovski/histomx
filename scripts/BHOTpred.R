@@ -486,7 +486,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
             #plot.background=element_rect(fill="white"),
             #panel.grid.minor=element_line(colour="gray"),
             panel.grid.major=element_line(colour="gray"),
-            panel.border=element_rect(colour=NA, fill=NA, size=5),
+            panel.border=element_rect(colour=NA, fill=NA, linewidth=5),
             legend.title = element_blank(),
             legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
             legend.position="right")
