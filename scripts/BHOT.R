@@ -285,7 +285,7 @@ qcAttributes <- function(attributes_table) {
         theme(panel.grid.major=element_blank(),
               panel.background=element_blank(), 
               axis.line=element_line(colour="black"),
-              panel.border=element_rect(colour="black", fill=NA, size=1),
+              panel.border=element_rect(colour="black", fill=NA, linewidth=1),
               plot.title = element_text(size=12, face = "bold"),
               axis.text=element_text(size=6, angle=270, family="sans", colour="black"), 
               axis.title.x=element_text(size=8, family="sans", colour="black"), 
@@ -400,7 +400,7 @@ qcCounts <- function(count_table) {
 		geom_point(shape = 21, size=3) + 
 		xlab("raw counts") + ylab("concentration (fM)") +
 		geom_text_repel(data=tab, aes(x=concentration, y=count, label=Name), size=4, colour="darkgray") +
-		geom_smooth(aes(fill=ID), method = "lm", fullrange=TRUE, se=TRUE, size=1, 
+		geom_smooth(aes(fill=ID), method = "lm", fullrange=TRUE, se=TRUE, linedwith=1, 
 			    color="slategray", formula = y ~ x, linetype="dashed")
 	
 	cat('\n----------------------------------\n',
@@ -602,7 +602,7 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
               axis.text.x=element_text(face="bold", size=12),
               axis.title.x=element_text(face="bold", size=12, angle=0), 
               axis.title.y=element_text(face="bold", size=12),  
-              panel.border=element_rect(colour="black", fill=NA, size=1))
+              panel.border=element_rect(colour="black", fill=NA, linewidth=1))
     
     ## select HK genes to be used in normalization
     ## manually or automatically (M<0.7)
@@ -932,12 +932,12 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
         geom_point(data=df.fit, aes(x=log2FoldChange, y=logP, color=sig), shape=19, size=4, alpha=0.7) +
         geom_text_repel(data=head(df.fit, num_genes), aes(x=log2FoldChange, y=logP, label=gene), colour="gray", size=3) +
         scale_color_manual(values=c("steelblue", "salmon")) + 
-        geom_vline(xintercept=0, linetype="dashed", size=0.4) +
-        geom_vline(xintercept=1, linetype="dashed", size=0.2) + geom_vline(xintercept=-1, size=0.2, linetype="dashed") +
+        geom_vline(xintercept=0, linetype="dashed", linewidth=0.4) +
+        geom_vline(xintercept=1, linetype="dashed", linewidth=0.2) + geom_vline(xintercept=-1, linewdith=0.2, linetype="dashed") +
         theme(panel.grid.major=element_blank(), panel.grid.minor=element_blank(),
               panel.background=element_blank(), axis.line=element_line(colour="black"),
-              panel.border=element_rect(colour="black", fill=NA, size=1),
-              plot.title = element_text(size=14, face = "bold"), legend.position="none",
+              panel.border=element_rect(colour="black", fill=NA, linewidth=1),
+              plot.title=element_text(size=14, face = "bold"), legend.position="none",
               axis.text=element_text(size=14, family="sans", colour="black"), 
               axis.title=element_text(size=14, family="sans", colour="black", face="bold"))
     
@@ -1030,7 +1030,7 @@ rccQC <- function(RCCfile, outPath) {
         	geom_point(shape = 21, colour="darkblue", size=3, fill = "dodgerblue") +
         	xlab("concentration") + ylab("raw counts") +
         	geom_text_repel(data=pos, aes(x=Conc, y=Count, label=Name), size=4, colour="darkgray") +
-        	geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, size=1, 
+        	geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, linewidth=1, 
                 	color="slategray", formula = y ~ x, linetype="dashed")
     ggsave(paste0(outPath, sampID, "/pcl_plot_", sampID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
     
