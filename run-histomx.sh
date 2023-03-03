@@ -8,13 +8,13 @@ mkdir -p $HISTOMX_PATH/refRCCs
 #symlink to ref RCCs
 #ln -s ~/Dropbox/PTG/transcriptomics/nanostring/kidney/refset/current/RefSet-KTD1-FFPE $HISTOMX_PATH/refRCCs
 
+$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/patient-test.txt -r ${HISTOMX_PATH}/test_files/rna-test.txt
+
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/empty.json -r ${HISTOMX_PATH}/test_files/rna-test.json
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/empty.json -r ${HISTOMX_PATH}/test_files/rna-test.txt
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/patient-test.json -r ${HISTOMX_PATH}/test_files/rna-test.json
-$HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/test.RCC -i 'test' -p ${HISTOMX_PATH}/test_files/patient-test.txt -r ${HISTOMX_PATH}/test_files/rna-test.txt
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/amr.RCC -i 'amr-test'
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/tcmr.RCC -i 'tcmr-test'
-
 $HISTOMX -m ${RMD_FILE} -f ~/Dropbox/PTG/transcriptomics/nanostring/kidney/beta-testing/KTD1-RNAlater-run-3/RCC/20201215_KTD1-RNAlater-run-3_NG-1738_05.RCC -i "NG-1738" -p ~/Desktop/patient-test.txt
 
 $HISTOMX -m ${RMD_FILE} -f ${HISTOMX_PATH}/test_files/20210401_RefSet-run-30_NS-413_11.RCC -i "NS-413" -p ${HISTOMX_PATH}/test_files/ns-413-patient.txt 

@@ -4,9 +4,6 @@
 ## predict probability of rejection on new biopsy
 source('../scripts/BHOT.R')
 
-norm_method="combined" #RUV
-#norm_method="separate" #HK
-
 ##-----------------------------------------------------
 ## load models
 ##-----------------------------------------------------
@@ -116,7 +113,7 @@ refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
 ##-----------------------------------------------------
-BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
+BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
 
     cat(">>Generating HistoMx molecular report...\n")
     cat("
@@ -124,7 +121,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
      O-o
       O
      o-O
-    o---O
+    o---O  H i s t o M x
     O---o
      O-o
       O
@@ -206,7 +203,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     	
     } else {
     	
-    	## normalized refset count
+    	## import normalized refset counts
     	ns.norm <- read.table('../model_data/kidney/tables/refset_counts_norm.txt', sep='\t', header=TRUE, check.names=FALSE)
     	rownames(ns.norm) <- ns.norm$ID
     	ns.norm$ID <- NULL
@@ -283,9 +280,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE) {
     bkv_boxplot <- ggplot(dat.m, aes(x = forcats::fct_rev(group), y = value, fill=group)) + geom_boxplot() +
       xlab("") + ylab("normalized expression") +
       scale_fill_manual(values=c("navy",  "lightsteelblue", "orange")) +
-      theme(legend.position="none", panel.border=element_rect(colour="gray", fill=NA, linewidth=1),
-            axis.text=element_text(size=16, color="black"), axis.title=element_text(size=16, color="black"),
-            panel.background=element_blank(), panel.grid.minor=element_line(colour="gray"))
+      theme(legend.position="none",
+            panel.border=element_rect(colour="gray", fill=NA, linewidth=1),
+            axis.text=element_text(size=16, color="black"),
+            axis.title=element_text(size=16, color="black"),
+            panel.background=element_blank(),
+            panel.grid.minor=element_line(colour="gray"))
 
     ## Wilcoxon rank sum test
     new_exp <- c(dat[dat$group %in% c("new"),"BK  VP1"], dat[dat$group %in% c("new"),"BK  large T Ag"])

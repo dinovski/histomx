@@ -67,7 +67,7 @@ outPath=paste0(newPath, '/histomx_results/')
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
-newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
+newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE, norm_method="combined") #RUVnorm w/refset
 newID <- newPreds$new_scores$ID
 
 newQC <- rccQC(newRCC, outPath)
@@ -93,7 +93,7 @@ if(!is.na(file.info(newPatient)$size)) {
 	## exclude empty cells
 	pt_df <- pt_df %>% dplyr::filter_all(all_vars(!is.na(.)))
       
-} else if (empty(pt_df)==TRUE) {
+} else if (exists('pt_df')==FALSE) {
 	## if no file, display empty data frame
 	pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
                         'Report date'=Sys.Date(), check.names=FALSE)
