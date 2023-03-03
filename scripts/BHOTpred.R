@@ -108,7 +108,7 @@ refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE
 
 #newRCC='../test_files/amr.RCC'
 #outPath='~/Downloads/'
-#preds<-BHOTpred(newRCC, outPath)
+#preds<-BHOTpred(newRCC, outPath, norm_method="combined")
 
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
@@ -164,15 +164,16 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	ns.raw <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
     	
     	ns.new <- parseRCC(newRCC)
-    	countTable <- merge(ns.raw, ns.new$counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
+    	new_counts <- ns.new$counts
+    	colnames(new_counts)[4] <- newID
+    	countTable <- merge(ns.raw, new_counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
     	rownames(countTable) <- countTable$Name
     	
-    	## rename newID if exists in refset sample names: rownames(dx_ref)
-    	samp_ind <- grep(newID, colnames(countTable))
+    	## rename conflicting ID if newID exists in refset sample names: rownames(dx_ref)
+    	samp_ind <- grep(paste0(newID,'$'), colnames(countTable))
     	if (length(samp_ind) > 1) {
-    		colnames(countTable)[samp_ind][1]<-newID
-    		colnames(countTable)[samp_ind][2]<-paste0(newID, "-new")
-    		newID<-paste0(newID, "-new")
+    		colnames(countTable)[samp_ind][1]<-paste0(newID, "-ref")
+    		colnames(countTable)[samp_ind][2]<-newID
     	}
     	
     	## expression matrix
@@ -212,6 +213,10 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	## normalize new sample separately
     	ns.new <- parseRCC(newRCC)
     	raw_counts <- ns.new$counts
+	colnames(raw_counts)[4]<-newID
+    	#endo_raw <- raw_counts[raw_counts$CodeClass=="Endogenous",4]
+
+    	# HK norm
     	colnames(raw_counts)[colnames(raw_counts)=="CodeClass"]<-"Code.Class"
     	ns.new.hk <- nanostringr::HKnorm(raw_counts)
     	ns.new.hk <- ns.new.hk[ns.new.hk$Code.Class=="Endogenous",]
