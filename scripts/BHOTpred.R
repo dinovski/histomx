@@ -137,17 +137,43 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
       cat("Output path:\n", outPath, "\n")
     }
 
-    ## get new sample ID
-    new.ns.data <- parseRCC(newRCC)
-    newID <- colnames(new.ns.data$attributes)[2]
+    ## import and parse new sample
+    ns.new <- parseRCC(newRCC)
+    newID <- colnames(ns.new$attributes)[2]
+    new_counts <- ns.new$counts
+    colnames(new_counts)[4] <- newID
+    
+    ## load refset counts, parse newRCC, and merge counts
+    ns.raw <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
+    endo_genes <- ns.raw[ns.raw$CodeClass=="Endogenous","Name"]
+    hk_genes <- ns.raw[ns.raw$CodeClass=="Housekeeping","Name"]
+    pos_genes <- ns.raw[ns.raw$CodeClass=="Positive","Name"]
+    neg_genes <- ns.raw[ns.raw$CodeClass=="Negative","Name"]
     
     ## verify BHOT sequencing panel
-    newRLF <- new.ns.data$attributes[new.ns.data$attributes$variable=="GeneRLF",newID]
+    newRLF <- ns.new$attributes[ns.new$attributes$variable=="GeneRLF",newID]
 
     if (newRLF != "NS_Hs_Transplant_v1.0") {
-      stop("The Gene RLF must be the same as the reference set: nCounter Human Organ Transplant Panel (NS_Hs_Transplant_v1.0)")
+    	
+    	cat(">>The input RLF (", newRLF, ") does not match the expected RLF ( NS_Hs_Transplant_v1.0 )\n")
+    	cat(">>Checking for B-HOT panel genes...\n")
+    	
+    	if (all(c(endo_genes, hk_genes) %in% new_counts[new_counts$CodeClass %in% c("Endogenous", "Housekeeping"),"Name"])) {
+    		
+    		cat(">>...All endogenous and housekeeping genes are present. Only B-HOT panel genes will be used.\n")
+    		new_counts <- new_counts[new_counts$Name %in% c(endo_genes, hk_genes, pos_genes, neg_genes),]
+    		cat(">>Generating predictions for sample:", newID, "\n")
+    		
+    	} else {
+    		
+    	   stop(">>The Gene RLF does not match the reference RLF: nCounter Human Organ Transplant Panel (NS_Hs_Transplant_v1.0)")
+    		
+    	}
+    	
     } else {
+    	
       cat(">>Generating predictions for sample:", newID, "\n")
+    	
     }
 
     ## create sample directory in outPath
@@ -159,13 +185,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     if (norm_method=="combined") {
 
     	## Normalize refset with new sample
-    	
-    	## load refset counts, parse newRCC, and merge counts
-    	ns.raw <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
-    	
-    	ns.new <- parseRCC(newRCC)
-    	new_counts <- ns.new$counts
-    	colnames(new_counts)[4] <- newID
     	countTable <- merge(ns.raw, new_counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
     	rownames(countTable) <- countTable$Name
     	
@@ -213,11 +232,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	ns.norm <- data.frame(t(ns.norm), check.names=F)
     	
     	## normalize new sample separately
-    	ns.new <- parseRCC(newRCC)
-    	raw_counts <- ns.new$counts
-	colnames(raw_counts)[4]<-newID
-    	#endo_raw <- raw_counts[raw_counts$CodeClass=="Endogenous",4]
-
     	# HK norm
     	colnames(raw_counts)[colnames(raw_counts)=="CodeClass"]<-"Code.Class"
     	ns.new.hk <- nanostringr::HKnorm(raw_counts)
