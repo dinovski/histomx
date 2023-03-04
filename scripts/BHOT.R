@@ -647,34 +647,38 @@ hkQC <- function(raw_counts, gene_annotations, group_labels=NULL) {
 
 ##------------------
 ## Normalize data
-## normalization: geNorm algorithm (Vandesompele 2002) to choose best genes for normalization 
-## (exc. ref genes to minimize pairwise variation)
 
 ## OPTION 1: nSolver
-NSnorm <- function(eset, background_correction=FALSE, take_log=TRUE) {
+NSnorm <- function(eset, background_correction=FALSE, code_count=FALSE, other_norm="none", take_log=TRUE) {
+    
+    x <- counts(eset)
+    ns_fdat <- fData(eset)
     
     ## 01 CodeCount normalization (adjust each sample based on relative value to all samples)
     #https://github.com/chrisrgc/NanoStringNorm/blob/master/R/code.count.normalization.R
-    ns_counts <- counts(eset)
-    ns_fdat <- fData(eset)
-    
-    posTab <- t(ns_counts[rownames(ns_counts) %in% ns_fdat[ns_fdat$CodeClass=="Positive","Name"],])
-    ## exclude POS_F (considered below lod)
-    
-    ## arithmetic mean of the geometric means of positive controls
-    pos.sample <- apply(posTab, MARGIN=1, FUN=geoMean);
-    pos.norm.factors <- data.frame(ID=names(pos.sample), mean=mean(pos.sample) / pos.sample)
-    pos.norm.factors$mean <- round(pos.norm.factors$mean, 2)
-    rownames(pos.norm.factors) <- NULL
-    
-    if ( any(pos.norm.factors$mean < 0.3) | any(pos.norm.factors$mean > 3) ) {
-        cat(">>Positive normalization factors out of range (<0.3 or >3):\n");
-        print.data.frame(pos.norm.factors[pos.norm.factors$mean<0.3 | pos.norm.factors$mean>3,])
+    if (code_count == TRUE) {
+    	cat(">>Performing code count (pos control) normalization\n");
+    	posTab <- t(ns_counts[rownames(ns_counts) %in% ns_fdat[ns_fdat$CodeClass=="Positive","Name"],])
+    	## exclude POS_F (considered below lod)
+    	posTab <- posTab[,(grep("POS_F", colnames(posTab), invert=TRUE))]
+    	
+    	## arithmetic mean of the geometric means of positive controls
+    	pos.sample <- apply(posTab, MARGIN=1, FUN=geoMean);
+    	pos.norm.factors <- data.frame(ID=names(pos.sample), mean=mean(pos.sample) / pos.sample)
+    	pos.norm.factors$mean <- round(pos.norm.factors$mean, 2)
+    	rownames(pos.norm.factors) <- NULL
+    	
+    	if ( any(pos.norm.factors$mean < 0.3) | any(pos.norm.factors$mean > 3) ) {
+    		cat(">>Positive normalization factors out of range (<0.3 or >3):\n");
+    		print.data.frame(pos.norm.factors[pos.norm.factors$mean<0.3 | pos.norm.factors$mean>3,])
+    	}
+    	
+    	## multiply normalization factor by raw counts
+    	x <- t(apply(x, MARGIN = 1, FUN = '*', pos.norm.factors$mean));
+    } else {
+    	cat("\n>>Code count normalization skipped\n")
     }
-    
-    # multiply normalization factor by raw counts
-    x <- t(apply(ns_counts, MARGIN = 1, FUN = '*', pos.norm.factors$mean));
-    
+
     ## 02 Background correction (subtract background from each sample)
     ## recommended for experiments in which low expressing targets common
     ## mean is least conservative; max and mean.2sd are most robust to FP
@@ -706,7 +710,6 @@ NSnorm <- function(eset, background_correction=FALSE, take_log=TRUE) {
         
     } else {
         cat("\n>>Background correction skipped\n")
-        x <- x
     }
     
     ## 03 SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
@@ -730,21 +733,27 @@ NSnorm <- function(eset, background_correction=FALSE, take_log=TRUE) {
     }
     
     ## adjust data based on normalization factors
-    x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
+    x <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
     
-    if (take_log == TRUE) {
-        cat('Counts are log transformed')
-        x.norm <- log2(x.norm);
+    ## TODO:apply additional normalization
+    if (other_norm == "quantile") {
+    	#https://github.com/cran/NanoStringNorm/blob/master/R/other.normalization.quantile.R
+    } else if (other_norm == "vsn") {
+    	#https://github.com/cran/NanoStringNorm/blob/master/R/other.normalization.vsn.R
+    	x.fit <- vsn::vsn2(x, verbose = verbose, ...);
+    	x.predict <- predict(x.fit, newdata = x.predict, useDataInFit = TRUE);
+    	x.predict <- data.frame(x.predict);
     }
-    
-    ## TODO:add additional normalization options
-    #https://github.com/cran/NanoStringNorm/blob/master/R/other.normalization.quantile.R
-    #https://github.com/cran/NanoStringNorm/blob/master/R/other.normalization.vsn.R
     
     ## endogenous genes only
     #x.norm <- x.norm[rownames(x.norm) %in% ns_fdat[ns_fdat$CodeClass=="Endogenous","Name"]]
     
-    return(x.norm)
+    if (take_log == TRUE) {
+    	cat('>>Counts are log transformed')
+    	x <- log2(x);
+    }
+    
+    return(x)
 }
 
 ## OPTION 2: RUV

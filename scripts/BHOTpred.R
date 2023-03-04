@@ -170,10 +170,12 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	rownames(countTable) <- countTable$Name
     	
     	## rename conflicting ID if newID exists in refset sample names: rownames(dx_ref)
-    	samp_ind <- grep(paste0(newID,'$'), colnames(countTable))
+    	#colnames(countTable)[grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))]
+    	samp_ind <- grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))
     	if (length(samp_ind) > 1) {
-    		colnames(countTable)[samp_ind][1]<-paste0(newID, "-ref")
-    		colnames(countTable)[samp_ind][2]<-newID
+    		colnames(countTable)[samp_ind][1]<-newID
+    		colnames(countTable)[samp_ind][2]<-gsub("-", "", newID)
+    		newID <- gsub("-", "", newID)
     	}
     	
     	## expression matrix
@@ -202,7 +204,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	colnames(new.ns.norm) <- newID
     	rownames(new.ns.norm) <- rownames(ns.norm)
     	
-    } else {
+    } else if (norm_method=="separate") {
     	
     	## import normalized refset counts
     	ns.norm <- read.table('../model_data/kidney/tables/refset_counts_norm.txt', sep='\t', header=TRUE, check.names=FALSE)
@@ -224,6 +226,10 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	new.ns.norm <- data.frame(ns.new.hk[,-c(1:3)], check.names=F)
     	colnames(new.ns.norm) <- colnames(ns.new.hk)[4]
     	rownames(new.ns.norm) <- rownames(ns.new.hk)
+	
+    	# center and scale new data to match training data
+    	#preproc <- preProcess(ns.norm, method = c("center", "scale"))
+    	#scaled.new <- predict(preproc, newdata = new.ns.norm)
     	
     	## combine refset and new norm counts
     	#all(rownames(ns.norm)==rownames(new.ns.norm))
