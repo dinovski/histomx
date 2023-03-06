@@ -158,19 +158,26 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     newID <- gsub("[<>(),;!@#$%?&/+]", "", newID)
     #newID <- gsub("[[:punct:]]", "", newID)
     
-    ## assign ID to counts and attributes files
-    new_counts <- ns.new$counts
-    colnames(new_counts)[4] <- newID
-    
-    new_attributes <- ns.new$attributes
-    colnames(new_attributes)[2] <- newID
-    
     ## load raw refset counts, parse newRCC, and merge counts
     ns.raw <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
     endo_genes <- ns.raw[ns.raw$CodeClass=="Endogenous","Name"]
     hk_genes <- ns.raw[ns.raw$CodeClass=="Housekeeping","Name"]
     pos_genes <- ns.raw[ns.raw$CodeClass=="Positive","Name"]
     neg_genes <- ns.raw[ns.raw$CodeClass=="Negative","Name"]
+    
+    ## check for conflicting sample ID with reference data
+    if (newID %in% colnames(ns.raw[,-c(1:3)])) {
+    	newID <- paste0(newID, ".x")
+    } else {
+    	newID = newID
+    }
+    
+    ## assign ID to counts and attributes files
+    new_counts <- ns.new$counts
+    colnames(new_counts)[4] <- newID
+    
+    new_attributes <- ns.new$attributes
+    colnames(new_attributes)[2] <- newID
     
     ## verify BHOT sequencing panel
     newRLF <- new_attributes[new_attributes$variable=="GeneRLF",newID]
@@ -235,12 +242,12 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	
     	## rename newID ID if exists in refset sample names: rownames(dx_ref)
     	#colnames(countTable)[grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))]
-    	samp_ind <- grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))
-    	if (length(samp_ind) > 1) {
-    		colnames(countTable)[samp_ind][1]<-newID
-    		colnames(countTable)[samp_ind][2]<-gsub("-", "", newID)
-    		newID <- gsub("-", "", newID)
-    	}
+    	# samp_ind <- grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))
+    	# if (length(samp_ind) > 1) {
+    	# 	colnames(countTable)[samp_ind][1]<-newID
+    	# 	colnames(countTable)[samp_ind][2]<-gsub("-", "", newID)
+    	# 	newID <- gsub("-", "", newID)
+    	# }
     	
     	## expression matrix
     	ns.counts <- as.matrix(countTable[,-c(1:3)])
@@ -312,13 +319,6 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	rownames(ns.norm) <- ns.norm$Row.names
     	ns.norm$Row.names <- NULL
     	
-    	## rename newID ID if exists in refset sample names
-    	samp_ind <- grep(paste0(newID, ".x|", newID, ".y"), colnames(ns.norm))
-    	if (length(samp_ind) > 1) {
-    		colnames(ns.norm)[samp_ind][1]<-newID
-    		colnames(ns.norm)[samp_ind][2]<-gsub("-", "", newID)
-    		newID <- gsub("-", "", newID)
-    	}
     }
     
     ##--------------
