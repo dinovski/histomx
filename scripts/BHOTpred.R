@@ -107,15 +107,19 @@ refRCCpath="../refRCCs/"
 refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE)
 
 #newRCC='../test_files/amr.RCC'
-#outPath='~/Downloads/'
-#preds<-BHOTpred(newRCC, outPath, norm_method="combined")
+#out_path='~/Downloads/'
+#preds<-BHOTpred(newRCC, out_path, norm_method="combined")
 
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
 ##-----------------------------------------------------
-BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
+# out_path can be set to specified output directory, otherwise the RCC file directory will be used
+# norm_method can be set to "separate" (default, single sample norm) "combined" (normalized with derivation cohort)
+# output_id can be set to "sample_id" (default, ID field in RCC file), "file_name" (RCC file basename), or string of choice
 
-    cat(">>Generating HistoMx molecular report...\n")
+BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate", output_id="sample_id") {
+
+    cat(">>Generating HistoMx report...\n")
     cat("
     O---o
      O-o
@@ -127,23 +131,41 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
       O
      o-O
     o---O\n")
-
+    cat("------------------------------\n")
+    
     ## if no output directory provided, output files to RCC file directory
-    if (exists('outPath')) {
-      outPath=outPath
-      cat("Output path:\n", outPath, "\n")
+    if (exists('out_path')) {
+    	out_path=out_path
+	cat("Output path:\n", out_path, "\n")
     } else {
-      outPath=paste0(dirname(newRCC), "/")
-      cat("Output path:\n", outPath, "\n")
+    	out_path=paste0(dirname(newRCC), "/")
+	cat("Output path:\n", out_path, "\n")
     }
 
     ## import and parse new sample
     ns.new <- parseRCC(newRCC)
-    newID <- colnames(ns.new$attributes)[2]
+    
+    if (output_id=="sample_id") {
+    	newID <- colnames(ns.new$attributes)[2]
+    } else if (output_id=="file_name") {
+    	newID <- gsub("\\.RCC", "", ns.new$attributes[ns.new$attributes$variable=="FileName",2])
+    } else {
+    	newID <- output_id
+    }
+    
+    ## remove spaces and special characters from sample ID
+    newID <- gsub(" ", "_", newID)
+    newID <- gsub("[<>(),;!@#$%?&/+]", "", newID)
+    #newID <- gsub("[[:punct:]]", "", newID)
+    
+    ## assign ID to counts and attributes files
     new_counts <- ns.new$counts
     colnames(new_counts)[4] <- newID
     
-    ## load refset counts, parse newRCC, and merge counts
+    new_attributes <- ns.new$attributes
+    colnames(new_attributes)[2] <- newID
+    
+    ## load raw refset counts, parse newRCC, and merge counts
     ns.raw <- read.table('../model_data/kidney/tables/refset_counts_raw.txt', sep='\t', header=TRUE, check.names=FALSE)
     endo_genes <- ns.raw[ns.raw$CodeClass=="Endogenous","Name"]
     hk_genes <- ns.raw[ns.raw$CodeClass=="Housekeeping","Name"]
@@ -151,7 +173,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     neg_genes <- ns.raw[ns.raw$CodeClass=="Negative","Name"]
     
     ## verify BHOT sequencing panel
-    newRLF <- ns.new$attributes[ns.new$attributes$variable=="GeneRLF",newID]
+    newRLF <- new_attributes[new_attributes$variable=="GeneRLF",newID]
 
     if (newRLF != "NS_Hs_Transplant_v1.0") {
     	
@@ -180,15 +202,37 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     dir.create(paste0(outPath, newID), recursive=TRUE, showWarnings=FALSE)
     newOut=paste0(outPath, newID)
 
+    ##---------------
+    ## Quality control assessment
+    newQC <- rccQC(newRCC, outPath)
+    qc_tab <- newQC$qc_table
+    qc_tab$variable <- rownames(qc_tab)
+    pos_e = as.numeric(qc_tab[qc_tab$variable=='POS_E counts',1])
+    lod = as.numeric(qc_tab[qc_tab$variable=='LoD',1])
+    
+    ## flag if POS_E not > LoD
+    if (!pos_e > lod) {
+    	cat(">>Sample failed limit of detection QC: interpret with caution")
+    }
+    
+    ## Abort report generation if any HK gene(s) below geoMean of NCG 
+    ncGeoMean = as.numeric(qc_tab[qc_tab$variable=='geo mean NEG genes',1])
+    hk_exp <- new_counts[new_counts$Name %in% hk_genes,4]
+    #hk_exp <- new_counts[new_counts$CodeClass=="Housekeeping",4] #all HK genes
+    if (any(hk_exp < ncGeoMean)) {
+    	stop(">>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected. Report cannot be generated.\n")
+    }
+    
+    ##---------------
+    ## Normalization
     cat(">>Normalizing raw count data: ", norm_method, "\n")
-
     if (norm_method=="combined") {
 
-    	## Normalize refset with new sample
+    	## Normalize new sample with refset 
     	countTable <- merge(ns.raw, new_counts, by=c("CodeClass", "Name", "Accession"), all.x=TRUE)
     	rownames(countTable) <- countTable$Name
     	
-    	## rename conflicting ID if newID exists in refset sample names: rownames(dx_ref)
+    	## rename newID ID if exists in refset sample names: rownames(dx_ref)
     	#colnames(countTable)[grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))]
     	samp_ind <- grep(paste0(newID, ".x|", newID, ".y"), colnames(countTable))
     	if (length(samp_ind) > 1) {
@@ -225,29 +269,47 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     	
     } else if (norm_method=="separate") {
     	
+    	## normalize new sample separately: multiply by HK norm factor
+    	rna.content.new <- geoMean(new_counts[rownames(new_counts) %in% hk_genes,4]);
+    	
+    	## calculate arithmetic mean of the geometric means of HK genes for each sample in the derivation cohort
+    	hk_refset <- ns.raw[ns.raw$Name %in% hk_genes,]
+    	rownames(hk_refset) <- hk_refset$Name
+    	rna.content.refset <- apply(hk_refset[,-c(1:3)], MARGIN=2, FUN=geoMean)
+
+    	#hk.norm.factor <- 100 / rna.content
+    	hk.norm.factor <- mean(rna.content.refset) / rna.content.new
+    	
+    	new.ns.norm <- new_counts[rownames(new_counts) %in% endo_genes,4] * hk.norm.factor
+    	new.ns.norm <- log2(new.ns.norm + 1);
+    	new.ns.norm <- data.frame(counts=new.ns.norm, check.names=FALSE)
+    	colnames(new.ns.norm) <- colnames(new_counts)[4]
+    	rownames(new.ns.norm) <- new_counts[new_counts$CodeClass=="Endogenous","Name"]
+    	
+    	new.ns.norm$gene <- rownames(new.ns.norm)
+    	new.ns.norm <- new.ns.norm[order(new.ns.norm$gene),]
+    	new.ns.norm$gene <- NULL
+    	
+    	## normalize new sample separately: subtract mean of HK genes from each endo gene
+    	# new.ns.norm <- log2(new_counts[rownames(new_counts) %in% endo_genes,4] + 1)
+    	# hkMean <- mean(log2(new_counts[rownames(new_counts) %in% hk_genes,4] + 1))
+    	# hkGeoMean <- log2(geoMean(new_counts[rownames(new_counts) %in% hk_genes,4]) +1)
+    	# new.ns.norm <- new.ns.norm - hkMean
+    	# new.ns.norm <- data.frame(counts=new.ns.norm, check.names=FALSE)
+    	# colnames(new.ns.norm) <- colnames(new_counts)[4]
+    	# rownames(new.ns.norm) <- new_counts[new_counts$CodeClass=="Endogenous","Name"]
+    	
     	## import normalized refset counts
     	ns.norm <- read.table('../model_data/kidney/tables/refset_counts_norm.txt', sep='\t', header=TRUE, check.names=FALSE)
     	rownames(ns.norm) <- ns.norm$ID
     	ns.norm$ID <- NULL
     	ns.norm <- data.frame(t(ns.norm), check.names=F)
     	
-    	## normalize new sample separately
-    	# HK norm
-    	colnames(raw_counts)[colnames(raw_counts)=="CodeClass"]<-"Code.Class"
-    	ns.new.hk <- nanostringr::HKnorm(raw_counts)
-    	ns.new.hk <- ns.new.hk[ns.new.hk$Code.Class=="Endogenous",]
-    	ns.new.hk <- ns.new.hk[order(ns.new.hk$Name),]
-    	new.ns.norm <- data.frame(ns.new.hk[,-c(1:3)], check.names=F)
-    	colnames(new.ns.norm) <- colnames(ns.new.hk)[4]
-    	rownames(new.ns.norm) <- rownames(ns.new.hk)
-	
-    	# center and scale new data to match training data
-    	#preproc <- preProcess(ns.norm, method = c("center", "scale"))
-    	#scaled.new <- predict(preproc, newdata = new.ns.norm)
-    	
     	## combine refset and new norm counts
     	#all(rownames(ns.norm)==rownames(new.ns.norm))
-    	ns.norm <- cbind(ns.norm, new.ns.norm)
+    	ns.norm <- merge(ns.norm, new.ns.norm, by=0)
+    	rownames(ns.norm) <- ns.norm$Row.names
+    	ns.norm$Row.names <- NULL
     }
     
     ##--------------
@@ -256,9 +318,9 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     ## multiply normalization factor by raw counts
     #x <- t(apply(x, MARGIN = 1, FUN = '*', pos.norm.factors$mean));
     ## SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
-    ## Normalize by substracting geometric mean of housekeeping genes from each endogenous gene
+    ## Normalize by multiplying geometric mean of housekeeping genes by each endogenous gene
     #hk_genes=countTable[countTable$CodeClass=="Housekeeping","Name"]
-    ## calculate normalization factor: arithmetic mean of the geometric means of positive controls
+    ## calculate normalization factor: arithmetic mean of the geometric means of HK genes
     #rna.content <- apply(x[rownames(x) %in% hk_genes,], MARGIN=2, FUN=geoMean);
     #hk.norm.factor <- mean(rna.content) / rna.content
     #x.norm <- t(apply(x, MARGIN = 1, FUN = '*', hk.norm.factor));
@@ -545,7 +607,6 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
             legend.title = element_blank(),
             legend.text = element_text(size=10), legend.key.size = unit(1, 'cm'),
             legend.position="right")
-
 
     ##-------------
     ## Test for enrichment
@@ -864,7 +925,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
     new_scores_pct <- tab %>% dplyr::select(ID, everything())
 
     ## output score table
-    if(saveFiles=="TRUE") {
+    if(save_files=="TRUE") {
       write.table(new_scores_pct, file=paste0(newOut, "/molecular_score_table_", newID, "_", Sys.Date(), ".txt"), quote=FALSE, sep='\t', row.names=FALSE)
     }
 
@@ -993,7 +1054,7 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
             axis.title.y=element_text(face="bold", size=12),
             panel.border=element_rect(colour="white", fill=NA, linewidth=5))
 
-    if (saveFiles=="TRUE") {
+    if (save_files=="TRUE") {
       ggsave(paste0(newOut, "/pca_dx_pc1_pc2_", newID, "_", Sys.Date(), ".pdf"), plot=pca_new_1_2, device="pdf", width=7, height=6)
     }
 
@@ -1167,21 +1228,22 @@ BHOTpred <- function(newRCC, outPath, saveFiles=FALSE, norm_method) {
 
     ##-------------------------------------------
     ## output files and plots for markdown report
-    return(list(new_scores=new_scores_pct,
-              ref_scores=ref.score.quantiles,
-              knn_dx=nn_dx,
-              #knn_banff=nn_banff,
-              pca_1_2=pca_new_1_2,
-              pca_2_3=pca_new_2_3,
-              aa_cluster_new=pred_aa, #new sample cluster probs
-              pca_archetype=pca_aa,
-              #aa_cluster_table=cluster_table,
-              pathways=pathway_table,
-              pathway_radar=pathway_radar,
-              cell_types=cell_type_table,
-              cell_type_radar=cell_type_radar,
-              bkv_plot=bkv_boxplot,
-              bkv_stats=bkv_tab)
+    return(list(qc_table=qc_tab,
+    		new_scores=new_scores_pct,
+        	ref_scores=ref.score.quantiles,
+        	knn_dx=nn_dx,
+        	#knn_banff=nn_banff,
+        	pca_1_2=pca_new_1_2,
+        	pca_2_3=pca_new_2_3,
+        	aa_cluster_new=pred_aa, #new sample cluster probs
+        	pca_archetype=pca_aa,
+        	#aa_cluster_table=cluster_table,
+        	pathways=pathway_table,
+        	pathway_radar=pathway_radar,
+        	cell_types=cell_type_table,
+        	cell_type_radar=cell_type_radar,
+        	bkv_plot=bkv_boxplot,
+        	bkv_stats=bkv_tab)
           )
 
 }

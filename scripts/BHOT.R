@@ -1,4 +1,4 @@
-## THIS IS THE MASTER SCRIPT (~/Dropbox/PTG/transcriptomics/nanostring/scripts/BHOTR/scripts/)
+## THIS IS THE MASTER SCRIPT
 
 ## Load dependencies
 library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "ModelMetrics", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "NormqPCR", "smotefamily", "stringr")
@@ -713,13 +713,13 @@ NSnorm <- function(eset, background_correction=FALSE, code_count=FALSE, other_no
     }
     
     ## 03 SampleContent (normalize to HK genes to account for sample or RNA content ie. pipetting fluctuations)
-    ## Normalize by substracting geometric mean of housekeeping genes from each endogenous gene
+    ## Normalize by multiplying geometric mean of housekeeping genes by each endogenous gene
     #https://github.com/chrisrgc/NanoStringNorm/blob/master/R/sample.content.normalization.R
     ## another option is to take top endo or HK genes with lowest CV (low.cv.geo.mean)
     
     hk_genes=ns_fdat[ns_fdat$CodeClass=="Housekeeping","Name"]
     
-    # calculate the normalization factor: arithmetic mean of the geometric means of positive controls
+    # calculate the normalization factor: arithmetic mean of all geometric means of HK genes
     rna.content <- apply(x[rownames(x) %in% hk_genes,], MARGIN=2, FUN=geoMean);
     hk.norm.factor <- mean(rna.content) / rna.content
     
@@ -792,7 +792,7 @@ RUVnorm <- function(eset, k, method="RUVg", control_genes=NULL) {
     	
         ## RUVg using negative control genes (ie. genes assumed not to be DE with respect to the covariate of interest)
         cat("applying RUVg normalization\n")
-    	eset_filt <- RUVg(eset_filt, c_idx, k=k, isLog=FALSE, round=TRUE)
+    	eset_filt <- RUVg(eset_filt, c_idx, k=k, isLog=FALSE, round=TRUE, center=TRUE, epsilon=1)
     	
     } else if(method=="RUVs") {
     	
@@ -837,7 +837,7 @@ RUVnorm <- function(eset, k, method="RUVg", control_genes=NULL) {
     mat <- removeBatchEffect(mat, covariates=covars)
     assay(vsd) <- mat
     
-    ## return expression set with unwanted variation added and log, normalized counts
+    ## return expression set with log transformed normalized counts and unwanted variation
     return(list(eset = eset_filt, 
                 vsd = vsd))
 }
@@ -997,18 +997,19 @@ rccQC <- function(RCCfile, outPath) {
     ## recommended threshold: >75%
     attTable$'% registered FOVs' <- round(attTable$FovCounted/attTable$FovCount*100, 2)
     
-    ## geometic means
+    ## geometric means
     attTable$'geo mean POS genes' <- exp(mean(log(countTable[countTable$CodeClass=="Positive",sampID]+1)))
     attTable$'geo mean NEG genes' <- exp(mean(log(countTable[countTable$CodeClass=="Negative",sampID]+1)))
     attTable$'geo mean ENDO genes' <- exp(mean(log(countTable[countTable$CodeClass=="Endogenous",sampID]+1)))
+    attTable$'geo mean HK genes' <- exp(mean(log(countTable[countTable$CodeClass=="Housekeeping",sampID]+1)))
     
     ## neg/pos control gene QC
-    ## POS_E counts should be > 2 sd from mean(NEG)
+    ## POS_E counts should be > 2 sd * mean(NEG)
     pos_e = countTable[grep("POS_E", countTable$Name),]
-    neg <- countTable[countTable$CodeClass=="Negative",]
+    ncg <- countTable[countTable$CodeClass=="Negative",]
     
-    ncgMean = mean(neg[,sampID])
-    ncgSD = sd(neg[,sampID])
+    ncgMean = mean(ncg[,sampID])
+    ncgSD = sd(ncg[,sampID])
     lod = ncgMean + 2*ncgSD
     llod = ncgMean - 2*ncgSD
     pos_e_counts = pos_e[,-c(1:3)]
@@ -1023,6 +1024,9 @@ rccQC <- function(RCCfile, outPath) {
     attTable$ncgSD <- ncgSD
     attTable$LoD <- lod
     attTable$'% ENDO genes above LoD' <- round(length(endoCounts[which(endoCounts$counts > lod),"gene"]) / nrow(endoCounts) * 100, 2)
+    
+    ## signal versus noise: S/N = ratio of geometric mean of HK / LoD
+    attTable$'SNratio' = attTable$'geo mean HK genes' / attTable$LoD
     
     ## positive control linearity
     pos <- countTable[countTable$CodeClass=="Positive",c("Name", sampID)]
@@ -1048,16 +1052,16 @@ rccQC <- function(RCCfile, outPath) {
     outTable <- attTable[!colnames(attTable) %in% c("Owner", "Comments", "SystemAPF", "laneID", "ScannerID", "StagePosition", "CartridgeBarcode", "CartridgeID")]
     outTable <- outTable[,c("FileVersion", "SoftwareVersion", "Date", "GeneRLF", 
                             "BindingDensity", "FovCount", "FovCounted", "% registered FOVs", 
-                            "geo mean POS genes", "geo mean NEG genes", "geo mean ENDO genes", 
+                            "geo mean POS genes", "geo mean NEG genes", "geo mean HK genes", "geo mean ENDO genes", 
                             "POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 
-                            "PCL")]
+                            "PCL", "SNratio")]
     vars_to_round <- c("BindingDensity", "FovCount", "FovCounted", "% registered FOVs", 
-                    "geo mean POS genes", "geo mean NEG genes", "geo mean ENDO genes", 
-                    "POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 
-                    "PCL")
+                	"geo mean POS genes", "geo mean NEG genes", "geo mean HK genes", "geo mean ENDO genes", 
+                	"POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 
+                	"PCL", "SNratio")
     ## round all numeric values to 2 decimal points
     outTable[vars_to_round] <- format(round(outTable[vars_to_round], 2), nsmall = 2)
-    outTable <- data.frame(t(outTable), check.names=FALSE)
+    outTable <- data.frame(t(outTable), check.names=FALSE, stringsAsFactors=FALSE)
     
     #write.table(outTable, quote=FALSE, sep='\t', row.names=TRUE,
     #           file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"))

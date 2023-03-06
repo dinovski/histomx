@@ -67,10 +67,8 @@ outPath=paste0(newPath, '/histomx_results/')
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
-newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE, norm_method="combined") #RUVnorm w/refset
+newPreds <- BHOTpred(newRCC, out_path=outPath, save_files=TRUE, norm_method="separate", output_id="sample_id")
 newID <- newPreds$new_scores$ID
-
-newQC <- rccQC(newRCC, outPath)
 ```
 
 ***
@@ -309,11 +307,8 @@ if(!is.na(file.info(newRNA)$size)) {
 
 ### NanoString run information
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
-newQC$qc_table$variable <- rownames(newQC$qc_table)
-#newQC$qc_table <- newQC$qc_table[!rownames(newQC$qc_table) %in% "POS_E counts",]
 
-qcTab <- newQC$qc_table
-colnames(qcTab) <- c(newID, "variable")
+qcTab <- newPreds$qc_table
 qcTab <- qcTab[!qcTab$variable %in% c("FovCount", "FovCounted", "ncgMean", "ncgSD", "FileVersion"),]
 qcTab <- qcTab %>% dplyr::select(variable, everything())
 
@@ -322,15 +317,14 @@ qcTab <- cbind(qcTab[1:(nrow(qcTab)/2),], qcTab[(nrow(qcTab)/2+1):nrow(qcTab),])
 kable(qcTab, row.names=FALSE, col.names=rep("", ncol(qcTab)), align='l', caption="", format="html") %>%
   column_spec(c(1,3), bold=TRUE, background="whitesmoke") %>%
   column_spec(c(2,4), background="white") %>% kable_styling()
-
-#The version of the RLF file must match the version of the CodeSet used in the hybridization
-#counts of POS_E should be higher than 2x the SD above the mean of the negative control
+#The lower the LOD the lower the expected level of background noise in the data
 #https://www.nanostring.com/wp-content/uploads/2020/12/Gene_Expression_Data_Analysis_Guidelines.pdf
 ```
-FoV=fields of view | geo mean=geometric mean | LoD=limit of detection | PCL=positive control linearity
+FoV=fields of view | geo mean=geometric mean | PCL=positive control linearity | 
+LoD=limit of detection | BD=binding density | SNratio=geo mean HK genes / LoD
 
 __Recommended QC thresholds:__  
-Registered FoVs >75% | PCL >0.95 | Binding Density 0.05-2.25 | 80% ENDO genes >LoD | POS_E counts >LoD  
+Registered FoVs>75% | PCL>0.95 | BD 0.05-2.25 | 50% ENDO genes>LoD | POS_E counts>LoD | SNratio>1 (Samples failing any of these QC flags should be interpreted with caution)
 
 ### For research use only:
 Models have been not been validated in clinical settings or trials. This report does not replace a standard diagnosis. Due to known technical variation, RNA later-fixed samples should be interpreted with caution.
