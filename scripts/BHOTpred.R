@@ -107,8 +107,8 @@ refRCCpath="../refRCCs/"
 refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE)
 
 #newRCC='../test_files/amr.RCC'
-#out_path='~/Downloads/'
-#preds<-BHOTpred(newRCC, out_path, norm_method="combined")
+#outPath='~/Downloads/'
+#preds<-BHOTpred(newRCC, out_path=outPath, norm_method="combined")
 
 ##-----------------------------------------------------
 ## generate new predictions for a single RCC file
@@ -204,7 +204,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
 
     ##---------------
     ## Quality control assessment
-    newQC <- rccQC(newRCC, out_path)
+    newQC <- rccQC(newRCC, outPath=out_path)
     qc_tab <- newQC$qc_table
     qc_tab$variable <- rownames(qc_tab)
     pos_e = as.numeric(qc_tab[qc_tab$variable=='POS_E counts',1])
@@ -220,7 +220,8 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     hk_exp <- new_counts[new_counts$Name %in% hk_genes,4]
     #hk_exp <- new_counts[new_counts$CodeClass=="Housekeeping",4] #all HK genes
     if (any(hk_exp < ncGeoMean)) {
-    	stop(">>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected. Report cannot be generated.\n")
+    	cat(">>ABORT: report cannot be generated\n")
+    	stop(">>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected.")
     }
     
     ##---------------
@@ -310,6 +311,14 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	ns.norm <- merge(ns.norm, new.ns.norm, by=0)
     	rownames(ns.norm) <- ns.norm$Row.names
     	ns.norm$Row.names <- NULL
+    	
+    	## rename newID ID if exists in refset sample names
+    	samp_ind <- grep(paste0(newID, ".x|", newID, ".y"), colnames(ns.norm))
+    	if (length(samp_ind) > 1) {
+    		colnames(ns.norm)[samp_ind][1]<-newID
+    		colnames(ns.norm)[samp_ind][2]<-gsub("-", "", newID)
+    		newID <- gsub("-", "", newID)
+    	}
     }
     
     ##--------------
