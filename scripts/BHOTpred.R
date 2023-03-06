@@ -198,13 +198,13 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	
     }
 
-    ## create sample directory in outPath
-    dir.create(paste0(outPath, newID), recursive=TRUE, showWarnings=FALSE)
-    newOut=paste0(outPath, newID)
+    ## create sample directory in out_path
+    dir.create(paste0(out_path, newID), recursive=TRUE, showWarnings=FALSE)
+    newOut=paste0(out_path, newID)
 
     ##---------------
     ## Quality control assessment
-    newQC <- rccQC(newRCC, outPath)
+    newQC <- rccQC(newRCC, out_path)
     qc_tab <- newQC$qc_table
     qc_tab$variable <- rownames(qc_tab)
     pos_e = as.numeric(qc_tab[qc_tab$variable=='POS_E counts',1])
@@ -985,8 +985,8 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	      panel.background=element_blank(),
     	      axis.line=element_line(colour="white"),
     	      axis.text.x=element_text(face="bold", size=14, angle=0),
-    	      axis.title.x=element_text(face="bold", size=14, angle=0),
     	      axis.text.y=element_text(size=14, angle=0),
+    	      axis.title.x=element_text(face="bold", size=14, angle=0),
     	      axis.title.y=element_text(face="bold", size=14),
     	      panel.border=element_rect(colour="gray", fill=NA, linewidth=1))
     #ggsave(paste0(newOut, "/amr_reference_boxplot_", Sys.Date(), ".pdf"), plot=boxplot_amr, device="pdf", width=8, height=6)
