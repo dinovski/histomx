@@ -965,7 +965,8 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
 
 ##------------------
 ## QC a single RCC file
-rccQC <- function(RCCfile, outPath) {
+## if saveFiles=TRUE, the PCL plot and attribute table will be saved to the outPath
+rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
     
     if (rlang::is_empty(outPath)) {
         cat("Output path:", outPath, "\n")
@@ -1015,6 +1016,15 @@ rccQC <- function(RCCfile, outPath) {
     llod = ncgMean - 2*ncgSD
     pos_e_counts = pos_e[,-c(1:3)]
     
+    ## Check if any HK genes below geoMean(ncg)
+    hk_exp <- countTable[countTable$CodeClass=="Housekeeping",4]
+    if (any(hk_exp < lod)) {
+    	attTable$'HK below Lod' <- length(which(hk_exp < lod))
+    	cat(">>Housekeeping gene(s) with expression below limit of detection detected.")
+    } else {
+    	attTable$'HK below Lod' <- 0
+    }
+    
     ## POS_E counts should be > lod
     ## % genes above LoD
     endoCounts <- countTable[countTable$CodeClass=="Endogenous",c("Name", sampID)]
@@ -1048,13 +1058,16 @@ rccQC <- function(RCCfile, outPath) {
         	geom_text_repel(data=pos, aes(x=Conc, y=Count, label=Name), size=4, colour="darkgray") +
         	geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, linewidth=1, 
                 	color="slategray", formula = y ~ x, linetype="dashed")
-    ggsave(paste0(outPath, sampID, "/pcl_plot_", sampID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
-    
+    if (saveFiles==TRUE) {
+    	ggsave(paste0(outPath, sampID, "/pcl_plot_", sampID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
+    	
+    }
+
     outTable <- attTable[!colnames(attTable) %in% c("Owner", "Comments", "SystemAPF", "laneID", "ScannerID", "StagePosition", "CartridgeBarcode", "CartridgeID")]
     outTable <- outTable[,c("FileVersion", "SoftwareVersion", "Date", "GeneRLF", 
                             "BindingDensity", "FovCount", "FovCounted", "% registered FOVs", 
                             "geo mean POS genes", "geo mean NEG genes", "geo mean HK genes", "geo mean ENDO genes", 
-                            "POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 
+                            "POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 'HK below Lod',
                             "PCL", "SNratio")]
     vars_to_round <- c("BindingDensity", "FovCount", "FovCounted", "% registered FOVs", 
                 	"geo mean POS genes", "geo mean NEG genes", "geo mean HK genes", "geo mean ENDO genes", 
@@ -1064,8 +1077,10 @@ rccQC <- function(RCCfile, outPath) {
     outTable[vars_to_round] <- format(round(outTable[vars_to_round], 2), nsmall = 2)
     outTable <- data.frame(t(outTable), check.names=FALSE, stringsAsFactors=FALSE)
     
-    #write.table(outTable, quote=FALSE, sep='\t', row.names=TRUE,
-    #           file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"))
+    if (saveFiles==TRUE) {
+    	write.table(outTable, file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"),
+    		    quote=FALSE, sep='\t', row.names=TRUE)
+    }
     
     ##-------------------------------------------
     ## output files and plots for markdown report

@@ -165,6 +165,12 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     pos_genes <- ns.raw[ns.raw$CodeClass=="Positive","Name"]
     neg_genes <- ns.raw[ns.raw$CodeClass=="Negative","Name"]
     
+    ## import normalized refset counts
+    ns.norm <- read.table('../model_data/kidney/tables/refset_counts_norm.txt', sep='\t', header=TRUE, check.names=FALSE)
+    rownames(ns.norm) <- ns.norm$ID
+    ns.norm$ID <- NULL
+    ns.norm <- data.frame(t(ns.norm), check.names=F)
+    
     ## check for conflicting sample ID with reference data
     if (newID %in% colnames(ns.raw[,-c(1:3)])) {
     	newID <- paste0(newID, ".x")
@@ -222,13 +228,15 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	cat(">>Sample failed limit of detection QC: interpret with caution")
     }
     
-    ## Abort report generation if any HK gene(s) below geoMean of NCG 
+    ## Abort report generation if any HK gene(s) below LoD or geoMean of NCG 
     ncGeoMean = as.numeric(qc_tab[qc_tab$variable=='geo mean NEG genes',1])
+    ncgMean = mean(new_counts[new_counts$CodeClass=="Housekeeping",4])
+    ncgSD = sd(new_counts[new_counts$CodeClass=="Housekeeping",4])
+    lod = ncgMean + 2*ncgSD
     hk_exp <- new_counts[new_counts$Name %in% hk_genes,4]
     #hk_exp <- new_counts[new_counts$CodeClass=="Housekeeping",4] #all HK genes
     if (any(hk_exp < ncGeoMean)) {
-    	cat(">>ABORT: report cannot be generated\n")
-    	stop(">>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected.")
+    	stop(">>ABORT: report cannot be generated\n>>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected.")
     }
     
     ##---------------
@@ -289,7 +297,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	hk.norm.factor <- mean(rna.content.refset) / rna.content.new
     	
     	new.ns.norm <- new_counts[rownames(new_counts) %in% endo_genes,4] * hk.norm.factor
-    	new.ns.norm <- log2(new.ns.norm + 1);
+    	new.ns.norm <- log2(new.ns.norm + 1)
     	new.ns.norm <- data.frame(counts=new.ns.norm, check.names=FALSE)
     	colnames(new.ns.norm) <- colnames(new_counts)[4]
     	rownames(new.ns.norm) <- new_counts[new_counts$CodeClass=="Endogenous","Name"]
@@ -298,7 +306,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	new.ns.norm <- new.ns.norm[order(new.ns.norm$gene),]
     	new.ns.norm$gene <- NULL
     	
-    	## normalize new sample separately: subtract mean of HK genes from each endo gene
+    	## subtract mean of HK genes from each endo gene
     	# new.ns.norm <- log2(new_counts[rownames(new_counts) %in% endo_genes,4] + 1)
     	# hkMean <- mean(log2(new_counts[rownames(new_counts) %in% hk_genes,4] + 1))
     	# hkGeoMean <- log2(geoMean(new_counts[rownames(new_counts) %in% hk_genes,4]) +1)
@@ -306,12 +314,6 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	# new.ns.norm <- data.frame(counts=new.ns.norm, check.names=FALSE)
     	# colnames(new.ns.norm) <- colnames(new_counts)[4]
     	# rownames(new.ns.norm) <- new_counts[new_counts$CodeClass=="Endogenous","Name"]
-    	
-    	## import normalized refset counts
-    	ns.norm <- read.table('../model_data/kidney/tables/refset_counts_norm.txt', sep='\t', header=TRUE, check.names=FALSE)
-    	rownames(ns.norm) <- ns.norm$ID
-    	ns.norm$ID <- NULL
-    	ns.norm <- data.frame(t(ns.norm), check.names=F)
     	
     	## combine refset and new norm counts
     	#all(rownames(ns.norm)==rownames(new.ns.norm))
