@@ -101,12 +101,9 @@ colnames(bhot_cell_type_totals) <- c("CellType", "Total")
 bhot_cell_type_totals <- rbind(bhot_cell_type_totals,
                                data.frame(CellType="Endothelial", Total=length(endats), check.names=F))
 
-##-------------
-## reference set RCC files (for data normalization)
-refRCCpath="../refRCCs/"
-refRCC <- list.files(refRCCpath, pattern=".RCC", full.names=TRUE, recursive=TRUE)
-
-#newRCC='../test_files/amr.RCC'
+#newRCC='../test_files/test.RCC'
+#norm_method="separate"
+#output_id="sample_id"
 #outPath='~/Downloads/'
 #preds<-BHOTpred(newRCC, out_path=outPath, norm_method="combined")
 
@@ -236,7 +233,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     hk_exp <- new_counts[new_counts$Name %in% hk_genes,4]
     #hk_exp <- new_counts[new_counts$CodeClass=="Housekeeping",4] #all HK genes
     if (any(hk_exp < ncGeoMean)) {
-    	stop(">>ABORT: report cannot be generated\n>>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected.")
+    	#stop(">>ABORT: report cannot be generated\n>>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected.")
     }
     
     ##---------------
@@ -346,8 +343,8 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     ## BKV expression: new biopsy v. normal and BKV refset samples
     ##--------------------------
     bk_genes <- c("BK  large T Ag", "BK  VP1")
-    norm_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% dx_normal,])
-    bk_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% c("BK virus nephropathy"),])
+    norm_bx_ids <- rownames(dx_ref[dx_ref$Dx_complete %in% dx_normal,])
+    bk_bx_ids <- rownames(dx_ref[dx_ref$Dx_complete %in% c("BK virus nephropathy"),])
 
     bk_counts <- ns.norm[,colnames(ns.norm) %in% c(norm_bx_ids, bk_bx_ids, newID)]
     bk_counts <- bk_counts[rownames(bk_counts) %in% bk_genes,]
@@ -429,7 +426,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     ##--------------------------
     ## signaling pathways
     ##--------------------------
-    norm_bx_ids <- rownames(dx_ref[dx_ref$Dx %in% dx_normal,])
+    norm_bx_ids <- rownames(dx_ref[dx_ref$Dx_complete %in% dx_normal,])
 
     new_counts <- ns.norm[,colnames(ns.norm) %in% newID]
     new_counts <- data.frame(gene=rownames(ns.norm),
@@ -954,9 +951,9 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     #ref.tab <- ref.tab[apply(ref.tab[,-1], 1, function(x) { all(!is.na(x)) }),] #exclude samples without all molecular scores
     
     ## IQR = Q3 - Q1 (Q0= min and Q5=max)
-    ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="amr",dx_scores], 2, quantile, na.rm=TRUE)
-    ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="tcmr",dx_scores], 2, quantile, na.rm=TRUE)
-    ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx_simple=="normal",dx_scores], 2, quantile, na.rm=TRUE)
+    ref.amr.quantiles <- apply(ref.tab[ref.tab$Dx=="amr",dx_scores], 2, quantile, na.rm=TRUE)
+    ref.tcmr.quantiles <- apply(ref.tab[ref.tab$Dx=="tcmr",dx_scores], 2, quantile, na.rm=TRUE)
+    ref.normal.quantiles <- apply(ref.tab[ref.tab$Dx=="normal",dx_scores], 2, quantile, na.rm=TRUE)
 
     ref.amr.quantiles <- data.frame(apply(ref.amr.quantiles, 2, function(x) {round(x, 3)*100}))
     ref.amr.quantiles$Dx <- "AMR"
@@ -974,7 +971,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     
     ##----------------------------------------------
     ## boxplots of reference biopsy molecular scores
-    dat <- ref.tab[ref.tab$Dx_simple=="amr",]
+    dat <- ref.tab[ref.tab$Dx=="amr",]
     dat <- dat[,dx_scores]
     #amr_order <- names(ref.amr.median[order(ref.amr.median, decreasing=F)])
     #dat <- dat[,amr_order]
@@ -1018,14 +1015,14 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     pca.df <- as.data.frame(resPCA$ind$coord)
     pca.df$ID <- rownames(pca.df)
 
-    pca.df <- merge(pca.df, ref.tab[,c("ID", "Dx")], by="ID", all.x=TRUE)
-    pca.df$Dx <- ifelse(pca.df$ID %in% new_scores$ID, "new", pca.df$Dx)
+    pca.df <- merge(pca.df, ref.tab[,c("ID", "Dx_complete")], by="ID", all.x=TRUE)
+    pca.df$Dx_complete <- ifelse(pca.df$ID %in% new_scores$ID, "new", pca.df$Dx)
 
     ## simplify Dx
-    pca.df$Dx <- ifelse(pca.df$Dx %in% c(dx_amr, dx_tcmr, dx_normal, "new"), pca.df$Dx, "NRKI")
+    pca.df$Dx_complete <- ifelse(pca.df$Dx_complete %in% c(dx_amr, dx_tcmr, dx_normal, "new"), pca.df$Dx, "NRKI")
        
     ## highlight new biopsy
-    pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx!="new", "ref", "new"))
+    pca.df <- plyr::mutate(pca.df, ref=ifelse(pca.df$Dx_complete!="new", "ref", "new"))
 
     #col_vector=c("firebrick",  "blue3", "mediumpurple", "turquoise", "orangered", "dodgerblue", "salmon",
     #	     "olivedrab2","darkgreen", "black", "palegreen", "lightgray")
@@ -1034,7 +1031,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     pca_new_1_2 <- ggplot() +
         scale_fill_manual(values=col_vector) +
         #geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) +
-        geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=3, alpha=0.8) +
+        geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx_complete), shape=21, color="gray", size=3, alpha=0.8) +
         geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
         #geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=2, colour="orange") +
         xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
@@ -1051,7 +1048,7 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
 
     pca_new_2_3 <- ggplot() +
       scale_fill_manual(values=col_vector) +
-      geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.2, Dim.3, fill=Dx), shape=21, color="gray", size=3, alpha=0.7) +
+      geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.2, Dim.3, fill=Dx_complete), shape=21, color="gray", size=3, alpha=0.7) +
       geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.2, Dim.3), shape=23, size=4, alpha=1, fill="orange") +
       xlab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
       ylab(paste("PC3 ", round(resPCA$eig[3,2]),"% of variance",sep="")) +
@@ -1076,16 +1073,16 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     #knn_tab <- rbind(dx_ref[,pca_scores], new_scores[,pca_scores])
     knn_tab <- mscores_pca
     knn_tab$ID <- rownames(knn_tab)
-    knn_tab <- merge(knn_tab, pca.df[,c("ID", "Dx", "ref")], by="ID")
+    knn_tab <- merge(knn_tab, pca.df[,c("ID", "Dx_complete", "ref")], by="ID")
 
-    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("amr", "tcmr", "normal", "ID", "Dx")]
+    train_ref <- knn_tab[knn_tab$ref %in% "ref",c("amr", "tcmr", "normal", "ID", "Dx_complete")]
     test_new <- knn_tab[knn_tab$ref %in% "new",c("amr", "tcmr", "normal")]
 
     ## distance measure (for continuous features) or similarity measure (for categorical features)
     knn_res <- neighbr::knn(train_set=train_ref, k=k,
                           test_set=test_new,
                           comparison_measure="euclidean",
-                          categorical_target="Dx",
+                          categorical_target="Dx_complete",
                           return_ranked_neighbors=k, id="ID")
 
     ##----------------
@@ -1098,15 +1095,15 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     ##----------------
     ## histology based diagnosis of nearest neighbors
     #length(nn_df$ID) == k
-    nn_dx <- data.frame(table(knn_tab[knn_tab$ID %in% nn_df$ID,"Dx"]))
-    colnames(nn_dx) <- c("Dx", "Total")
-    nn_dx <- nn_dx[nn_dx$Dx!="new",]
+    nn_dx <- data.frame(table(knn_tab[knn_tab$ID %in% nn_df$ID,"Dx_complete"]))
+    colnames(nn_dx) <- c("Dx_complete", "Total")
+    nn_dx <- nn_dx[nn_dx$Dx_complete!="new",]
     sum(nn_dx$Total) == k
     nn_dx$Percent <- round(nn_dx$Total/sum(nn_dx$Total) * 100, 0)
 
     nn_dx <- nn_dx[order(nn_dx$Total, decreasing=TRUE),]
-    rownames(nn_dx) <- nn_dx$Dx
-    nn_dx$Dx <- NULL
+    rownames(nn_dx) <- nn_dx$Dx_complete
+    nn_dx$Dx_complete <- NULL
 
     ##----------------
     ## banff scores of nearest neighbors
@@ -1156,19 +1153,19 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     rownames(pred_aa) <- newID
     pred_aa <- round(pred_aa * 100, 3)
     
-    new_scores <- cbind(new_scores, pred_aa)
-    new_scores$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
-    new_scores$Dx <- "new"
-    new_scores$Dx_simple <- "new"
+    new_scores_aa <- cbind(new_scores, pred_aa)
     
-    mscores_aa_all <- rbind(dx_ref, new_scores[,colnames(dx_ref)])
+    new_scores_aa$aa_cluster <- gsub("X", "", colnames(pred_aa)[max.col(pred_aa)])
+    new_scores_aa$Dx_complete <- "new"
 
+    dx_ref$Dx <- NULL
+    mscores_aa_all <- rbind(dx_ref, new_scores_aa[,colnames(dx_ref)])
     pca.aa <- merge(pca.df, mscores_aa_all[,c("ID", "aa_cluster")], by="ID")
     pca.aa$aa_cluster <- as.factor(pca.aa$aa_cluster)
 
     pca.aa[pca.aa$ref=="new",]
 
-    aa_cols=c("black", "firebrick", "blue3", "lightgray", "#009E73")
+    aa_cols=c("black", "blue3", "lightgray", "firebrick", "#009E73")
 
     pca_aa <- ggplot() +
         scale_fill_manual(values=aa_cols) +

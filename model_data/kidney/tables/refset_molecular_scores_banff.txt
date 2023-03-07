@@ -1,4 +1,4 @@
-ID	Dx	g_score	ptc_score	cg_score	i_score	t_score	v_score	ci_score	ct_score	ifta_score	ti_score	iifta_score	tifta_score	cv_score	ah_score	aah_score	mm_score	c4d_score
+ID	Dx_complete	g_score	ptc_score	cg_score	i_score	t_score	v_score	ci_score	ct_score	ifta_score	ti_score	iifta_score	tifta_score	cv_score	ah_score	aah_score	mm_score	c4d_score
 BL-37	Normal or minimal changes	0	0	0	0	1	0	0	0	0	0	0	NA	1	1	NA	0	0
 BL-1	Normal or minimal changes	0	0	0	0	1	0	0	0	0	0	0	NA	1	1	NA	0	0
 BL-3	Normal or minimal changes	0	0	0	0	1	0	1	1	1	0	NA	NA	3	1	NA	1	0

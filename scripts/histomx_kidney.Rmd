@@ -309,7 +309,7 @@ if(!is.na(file.info(newRNA)$size)) {
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
 
 qcTab <- newPreds$qc_table
-qcTab <- qcTab[!qcTab$variable %in% c("FovCount", "FovCounted", "ncgMean", "ncgSD", "FileVersion"),]
+qcTab <- qcTab[!qcTab$variable %in% c("FovCount", "FovCounted", "ncgMean", "ncgSD", "FileVersion", "SoftwareVersion"),]
 qcTab <- qcTab %>% dplyr::select(variable, everything())
 
 qcTab <- cbind(qcTab[1:(nrow(qcTab)/2),], qcTab[(nrow(qcTab)/2+1):nrow(qcTab),])
@@ -317,6 +317,7 @@ qcTab <- cbind(qcTab[1:(nrow(qcTab)/2),], qcTab[(nrow(qcTab)/2+1):nrow(qcTab),])
 kable(qcTab, row.names=FALSE, col.names=rep("", ncol(qcTab)), align='l', caption="", format="html") %>%
   column_spec(c(1,3), bold=TRUE, background="whitesmoke") %>%
   column_spec(c(2,4), background="white") %>% kable_styling()
+
 #The lower the LOD the lower the expected level of background noise in the data
 #https://www.nanostring.com/wp-content/uploads/2020/12/Gene_Expression_Data_Analysis_Guidelines.pdf
 ```
