@@ -225,15 +225,15 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	cat(">>Sample failed limit of detection QC: interpret with caution")
     }
     
-    ## Abort report generation if any HK gene(s) below LoD or geoMean of NCG 
-    ncGeoMean = as.numeric(qc_tab[qc_tab$variable=='geo mean NEG genes',1])
-    ncgMean = mean(new_counts[new_counts$CodeClass=="Housekeeping",4])
-    ncgSD = sd(new_counts[new_counts$CodeClass=="Housekeeping",4])
+    ## Check if any HK gene(s) below LoD or geoMean of NCG 
+    ncGeoMean = as.numeric(qc_tab[qc_tab$variable=='geoMean NEG genes',1])
+    ncgMean = mean(new_counts[new_counts$CodeClass=="Negative",4])
+    ncgSD = sd(new_counts[new_counts$CodeClass=="Negative",4])
     lod = ncgMean + 2*ncgSD
     hk_exp <- new_counts[new_counts$Name %in% hk_genes,4]
     #hk_exp <- new_counts[new_counts$CodeClass=="Housekeeping",4] #all HK genes
-    if (any(hk_exp < ncGeoMean)) {
-    	#stop(">>ABORT: report cannot be generated\n>>Sample failed QC: housekeeping gene(s) with expression below negative control probes detected.")
+    if (any(hk_exp < lod)) {
+    	cat(">>Housekeeping gene(s) with expression below limit of detection. Results are not reliable.")
     }
     
     ##---------------
@@ -1030,10 +1030,10 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     	     
     pca_new_1_2 <- ggplot() +
         scale_fill_manual(values=col_vector) +
-        #geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx), shape=21, color="gray", size=4, alpha=0.7) +
+        #geom_point(data=pca.df, aes(Dim.1, Dim.2, fill=Dx_complete), shape=21, color="gray", size=4, alpha=0.7) +
         geom_point(data=pca.df[pca.df$ref=="ref",], aes(Dim.1, Dim.2, fill=Dx_complete), shape=21, color="gray", size=3, alpha=0.8) +
         geom_point(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2), shape=23, size=4, alpha=1, fill="orange") +
-        #geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=2, colour="orange") +
+        geom_text_repel(data=pca.df[pca.df$ref=="new",], aes(Dim.1, Dim.2, label=ID), size=2, colour="orange") +
         xlab(paste("PC1 ", round(resPCA$eig[1,2]),"% of variance",sep="")) +
         ylab(paste("PC2 ", round(resPCA$eig[2,2]),"% of variance",sep="")) +
         theme(legend.position="top", legend.title=element_blank(),

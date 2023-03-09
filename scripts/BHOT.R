@@ -383,7 +383,7 @@ qcCounts <- function(count_table) {
 		cat("\n>>Positive control linearity [lm(counts ~ concentration)] is > 0.95 for all samples\n")
 	}
 	
-	## add positive control linearity to geo means table
+	## add positive control linearity to geoMeans table
 	pcl_tab <- data.frame(PCL=positiveLinearityQC)
 	pcl_tab$ID <- rownames(pcl_tab)
 	
@@ -966,7 +966,7 @@ plotVolcano <- function(df.fit, p_cutoff=0.05, num_genes=20, plot_title=NULL) {
 ##------------------
 ## QC a single RCC file
 ## if saveFiles=TRUE, the PCL plot and attribute table will be saved to the outPath
-rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
+rccQC <- function(RCCfile, outPath, saveFiles=FALSE, output_id="sample_id") {
     
     if (rlang::is_empty(outPath)) {
         cat("Output path:", outPath, "\n")
@@ -979,18 +979,31 @@ rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
     ## import + parse RCC file
     ns.data <- parseRCC(RCCfile)
     
+    if (output_id=="sample_id") {
+    	newID <- colnames(ns.data$attributes)[2]
+    } else if (output_id=="file_name") {
+    	newID <- gsub("\\.RCC", "", ns.data$attributes[ns.data$attributes$variable=="FileName",2])
+    } else {
+    	newID <- output_id
+    }
+    
+    ## remove spaces and special characters from sample ID
+    newID <- gsub(" ", "_", newID)
+    newID <- gsub("[<>(),;!@#$%?&/+]", "", newID)
+    
     ## extract raw counts
     countTable <- ns.data$counts
     rownames(countTable) <- countTable$Name
+    colnames(countTable)[4]<-newID
     
     ## extract attribute table
     attTable <- ns.data$attributes
     rownames(attTable) <- attTable$variable
     attTable$variable <- NULL
+    colnames(attTable)<-newID
     attTable <- data.frame(t(attTable), check.names=FALSE)
-    sampID <- attTable$sampID
     
-    newOut <- paste0(outPath, sampID, "/")
+    newOut <- paste0(outPath, newID, "/")
     dir.create(newOut, recursive=TRUE, showWarnings=FALSE)
     
     numeric_vars <- c("FileVersion", "laneID", "BindingDensity", "FovCount", "FovCounted")
@@ -1000,18 +1013,18 @@ rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
     attTable$'% registered FOVs' <- round(attTable$FovCounted/attTable$FovCount*100, 2)
     
     ## geometric means
-    attTable$'geo mean POS genes' <- exp(mean(log(countTable[countTable$CodeClass=="Positive",sampID]+1)))
-    attTable$'geo mean NEG genes' <- exp(mean(log(countTable[countTable$CodeClass=="Negative",sampID]+1)))
-    attTable$'geo mean ENDO genes' <- exp(mean(log(countTable[countTable$CodeClass=="Endogenous",sampID]+1)))
-    attTable$'geo mean HK genes' <- exp(mean(log(countTable[countTable$CodeClass=="Housekeeping",sampID]+1)))
+    attTable$'geoMean POS genes' <- exp(mean(log(countTable[countTable$CodeClass=="Positive",newID]+1)))
+    attTable$'geoMean NEG genes' <- exp(mean(log(countTable[countTable$CodeClass=="Negative",newID]+1)))
+    attTable$'geoMean ENDO genes' <- exp(mean(log(countTable[countTable$CodeClass=="Endogenous",newID]+1)))
+    attTable$'geoMean HK genes' <- exp(mean(log(countTable[countTable$CodeClass=="Housekeeping",newID]+1)))
     
     ## neg/pos control gene QC
     ## POS_E counts should be > 2 sd * mean(NEG)
     pos_e = countTable[grep("POS_E", countTable$Name),]
     ncg <- countTable[countTable$CodeClass=="Negative",]
     
-    ncgMean = mean(ncg[,sampID])
-    ncgSD = sd(ncg[,sampID])
+    ncgMean = mean(ncg[,newID])
+    ncgSD = sd(ncg[,newID])
     lod = ncgMean + 2*ncgSD
     llod = ncgMean - 2*ncgSD
     pos_e_counts = pos_e[,-c(1:3)]
@@ -1019,15 +1032,15 @@ rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
     ## Check if any HK genes below geoMean(ncg)
     hk_exp <- countTable[countTable$CodeClass=="Housekeeping",4]
     if (any(hk_exp < lod)) {
-    	attTable$'HK below Lod' <- length(which(hk_exp < lod))
+    	attTable$'HK below LoD' <- length(which(hk_exp < lod))
     	cat(">>Housekeeping gene(s) with expression below limit of detection detected.")
     } else {
-    	attTable$'HK below Lod' <- 0
+    	attTable$'HK below LoD' <- 0
     }
     
     ## POS_E counts should be > lod
     ## % genes above LoD
-    endoCounts <- countTable[countTable$CodeClass=="Endogenous",c("Name", sampID)]
+    endoCounts <- countTable[countTable$CodeClass=="Endogenous",c("Name", newID)]
     colnames(endoCounts) <- c("gene", "counts")
     
     attTable$'POS_E counts' <- pos_e_counts
@@ -1037,10 +1050,10 @@ rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
     attTable$'% ENDO genes above LoD' <- round(length(endoCounts[which(endoCounts$counts > lod),"gene"]) / nrow(endoCounts) * 100, 2)
     
     ## signal versus noise: S/N = ratio of geometric mean of HK / LoD
-    attTable$'SNratio' = attTable$'geo mean HK genes' / attTable$LoD
+    attTable$'SNratio' = attTable$'geoMean HK genes' / attTable$LoD
     
     ## positive control linearity
-    pos <- countTable[countTable$CodeClass=="Positive",c("Name", sampID)]
+    pos <- countTable[countTable$CodeClass=="Positive",c("Name", newID)]
     pos <- pos[grep("POS_F", pos$Name, invert=TRUE),] ## POS_F should be < limit of detection
     colnames(pos) <- c("Name", "Count")
     
@@ -1059,18 +1072,18 @@ rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
         	geom_smooth(method = "lm", fullrange=TRUE, se=TRUE, linewidth=1, 
                 	color="slategray", formula = y ~ x, linetype="dashed")
     if (saveFiles==TRUE) {
-    	ggsave(paste0(outPath, sampID, "/pcl_plot_", sampID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
+    	ggsave(paste0(outPath, newID, "/pcl_plot_", newID, "_", Sys.Date(), ".pdf"), plot=plot_pos_linearity, device="pdf", width=7, height=7)
     	
     }
 
     outTable <- attTable[!colnames(attTable) %in% c("Owner", "Comments", "SystemAPF", "laneID", "ScannerID", "StagePosition", "CartridgeBarcode", "CartridgeID")]
     outTable <- outTable[,c("FileVersion", "SoftwareVersion", "Date", "GeneRLF", 
                             "BindingDensity", "FovCount", "FovCounted", "% registered FOVs", 
-                            "geo mean POS genes", "geo mean NEG genes", "geo mean HK genes", "geo mean ENDO genes", 
-                            "POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 'HK below Lod',
+                            "geoMean POS genes", "geoMean NEG genes", "geoMean HK genes", "geoMean ENDO genes", 
+                            "POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 'HK below LoD',
                             "PCL", "SNratio")]
     vars_to_round <- c("BindingDensity", "FovCount", "FovCounted", "% registered FOVs", 
-                	"geo mean POS genes", "geo mean NEG genes", "geo mean HK genes", "geo mean ENDO genes", 
+                	"geoMean POS genes", "geoMean NEG genes", "geoMean HK genes", "geoMean ENDO genes", 
                 	"POS_E counts", "ncgMean", "ncgSD", "LoD", "% ENDO genes above LoD", 
                 	"PCL", "SNratio")
     ## round all numeric values to 2 decimal points
@@ -1078,7 +1091,7 @@ rccQC <- function(RCCfile, outPath, saveFiles=FALSE) {
     outTable <- data.frame(t(outTable), check.names=FALSE, stringsAsFactors=FALSE)
     
     if (saveFiles==TRUE) {
-    	write.table(outTable, file=paste0(outPath, sampID, "/run_attribute_table_", sampID, "_", Sys.Date(), ".txt"),
+    	write.table(outTable, file=paste0(outPath, newID, "/run_attribute_table_", newID, "_", Sys.Date(), ".txt"),
     		    quote=FALSE, sep='\t', row.names=TRUE)
     }
     

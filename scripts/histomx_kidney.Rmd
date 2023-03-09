@@ -321,11 +321,12 @@ kable(qcTab, row.names=FALSE, col.names=rep("", ncol(qcTab)), align='l', caption
 #The lower the LOD the lower the expected level of background noise in the data
 #https://www.nanostring.com/wp-content/uploads/2020/12/Gene_Expression_Data_Analysis_Guidelines.pdf
 ```
-FoV=fields of view | geo mean=geometric mean | PCL=positive control linearity | 
-LoD=limit of detection | BD=binding density | SNratio=geo mean HK genes / LoD
+__FoV__=fields of view | __geoMean__=geometric mean | __PCL__=positive control linearity |
+__LoD__=limit of detection | __BD__=binding density | __SNratio__=geoMean of HK genes:LoD
 
-__Recommended QC thresholds:__  
-Registered FoVs>75% | PCL>0.95 | BD 0.05-2.25 | 50% ENDO genes>LoD | POS_E counts>LoD | SNratio>1 (Samples failing any of these QC flags should be interpreted with caution)
+__Recommended QC thresholds:__    
+Registered FoVs>75% | PCL>0.95 | BD 0.05-2.25 | 50% ENDO genes>LoD | POS_E counts>LoD | SNratio>1 | HK genes below LoD=0  
+*Samples failing multiple QC flags and/or with >0 HK genes below LoD should be rerun.* 
 
 ### For research use only:
 Models have been not been validated in clinical settings or trials. This report does not replace a standard diagnosis. Due to known technical variation, RNA later-fixed samples should be interpreted with caution.
