@@ -68,7 +68,7 @@ exp_design <- read.table('../model_data/kidney/tables/exp_design.txt', header=TR
 dx_amr <- c("Active AMR", "Chronic active AMR", "Chronic inactive AMR")
 dx_tcmr <- c("Acute TCMR", "Chronic active TCMR")
 dx_normal <- c("Normal or minimal changes", "Pristine")
-dx_no_rejection <- unique(dx_ref$Dx)[!unique(dx_ref$Dx) %in% c(dx_amr, dx_tcmr)]
+dx_no_rejection <- unique(dx_ref$Dx)[!unique(dx_ref$Dx) %in% c("amr", "tcmr")]
 
 ##-----------------------------------------------------
 ## import BHOT gene annotations

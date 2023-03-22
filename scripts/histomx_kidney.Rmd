@@ -171,8 +171,8 @@ dx_tab <- dx_tab[!dx_tab$Diagnosis %in% "normal",] #exclude NONREJECTION score
 #TODO: scale probabilities relative to normal biopsies (eg. +/- SD)
 dx_tab$Interpretation <- ifelse(dx_tab[,newID]<=10,"unlikely",
                                        ifelse(dx_tab[,newID]>10 & dx_tab[,newID]<=20,"low probability",
-                                              ifelse(dx_tab[,newID]>20 & dx_tab[,newID]<=40,"moderate probability",
-                                                     ifelse(dx_tab[,newID]>40 & dx_tab[,newID]<=60,"moderate/high probability",
+                                              ifelse(dx_tab[,newID]>20 & dx_tab[,newID]<=40,"low/moderate probability",
+                                                     ifelse(dx_tab[,newID]>40 & dx_tab[,newID]<=60,"moderate probability",
                                                            ifelse(dx_tab[,newID]>60 & dx_tab[,newID]<=80,"high probability",
                                                                   ifelse(dx_tab[,newID]>80,"very high probability","NA"))))))
 
@@ -244,6 +244,7 @@ if(!is.na(file.info(newRNA)$size)) {
   	if (tools::file_ext(newRNA) == "json") {
 		jfile <- fromJSON(file=newRNA)
 		rna_df <- as.data.frame(jfile, check.names=F)
+		rna_df <- data.frame(V1=colnames(rna_df), V2=t(rna_df))
 	} else if (tools::file_ext(newRNA) == "txt") {
 		rna_df <- read.table(newRNA, check.names=F, sep='\t')
 	} else {

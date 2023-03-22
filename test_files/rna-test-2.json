@@ -1,0 +1,8 @@
+{
+    "platform id": "test",
+    "center id": "necker",
+    "concentration": 25,
+    "units": "ng/ul",
+    "260/280 ratio": null,
+    "260/230 ratio": null
+}
