@@ -81,13 +81,20 @@ if(!is.na(file.info(newPatient)$size)) {
   
 	if (tools::file_ext(newPatient) == "json") {
 		jfile <- fromJSON(file=newPatient)
-		pt_df <- as.data.frame(jfile, check.names=F)
+		jfile <- jsonlite:::null_to_na(jfile) # convert NULL to NA
+		pt_df <- as.data.frame(jfile, check.names=F, fix.empty.names=F)
 	} else if (tools::file_ext(newPatient) == "txt") {
 		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"), encoding="UTF-8")
 	} else {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
 
+	## if all vars in imported file are null, display empty data frame
+	if (nrow(pt_df) == 0) {
+		pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
+                        'Report date'=Sys.Date(), check.names=FALSE)
+		pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
+	}
 	## exclude empty cells
 	pt_df <- pt_df %>% dplyr::filter_all(all_vars(!is.na(.)))
       
@@ -252,6 +259,12 @@ if(!is.na(file.info(newRNA)$size)) {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
 
+	## create data frame if imported variables all null
+	if (nrow(rna_df) == 0) {
+		rna_df <- data.frame(V1=c("platform id", "center_id", "260/280 ratio", "260/230 ratio", "concentration", "units"),
+				     V2=c(newPreds$new_scores$ID, NA, NA, NA, NA, "ng/ul"))
+	}
+	
 	## auto-fill units if missing
 	if(!c("units") %in% rna_df[,1]) {
 		cat("Adding a column for units (ng/ul)")
@@ -261,7 +274,6 @@ if(!is.na(file.info(newRNA)$size)) {
 	## transpose and use first column as header
 	if(nrow(rna_df) > 2) {
 		rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])
-		rna_df$concentration <- as.numeric(rna_df$concentration)
 	}
 
 	## if units (ng/ul) included in RNA concentration strip; else convert to numeric
@@ -276,22 +288,34 @@ if(!is.na(file.info(newRNA)$size)) {
 	rna_df <- rna_df %>% relocate(units, .after=last_col())
 
 	## apply threshold based text color and add back units
-	if(rna_df$concentration >= 20) {
-		rna_df$status <- "Passed"
-		status_color="green"
-	} else if(rna_df$concentration>=10 & rna_df$concentration<20) {
-		rna_df$status <- "Caution"
-		status_color="goldenrod"
-	} else if(rna_df$concentration < 10) {
-		rna_df$status <- "Warning"
-		status_color="firebrick"
+	if (!is.na(rna_df$concentration)) {
+		
+		rna_df$concentration <- as.numeric(rna_df$concentration)
+		
+		if(rna_df$concentration >= 20) {
+			rna_df$status <- "Passed"
+			status_color="green"
+		} else if(rna_df$concentration>=10 & rna_df$concentration<20) {
+			rna_df$status <- "Caution"
+			status_color="goldenrod"
+		} else if(rna_df$concentration < 10) {
+			rna_df$status <- "Warning"
+			status_color="firebrick"
+		}
+		
+		kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
+		column_spec(1, bold=TRUE, color="dodgerblue") %>%
+		column_spec(ncol(rna_df), bold=TRUE, color=status_color) %>%
+		row_spec(1, background="white")
+		
+	} else {
+		kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
+		column_spec(1, bold=TRUE, color="dodgerblue") %>%
+		column_spec(ncol(rna_df), bold=TRUE) %>%
+		row_spec(1, background="white")
 	}
+	
 
-	kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
-	column_spec(1, bold=TRUE, color="dodgerblue") %>%
-	column_spec(ncol(rna_df), bold=TRUE, color=status_color) %>%
-	row_spec(1, background="white")
-  
 } else {
 	## display empty data frame
 	rna_df <- data.frame(ID=newPreds$new_scores$ID, '260/280 ratio'="NA", '260/230 ratio'="NA",
