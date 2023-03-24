@@ -243,7 +243,8 @@ if(!is.na(file.info(newRNA)$size)) {
   
   	if (tools::file_ext(newRNA) == "json") {
 		jfile <- fromJSON(file=newRNA)
-		rna_df <- as.data.frame(jfile, check.names=F)
+		jfile <- jsonlite:::null_to_na(jfile) # convert NULL to NA
+		rna_df <- as.data.frame(jfile, check.names=F, fix.empty.names=F)
 		rna_df <- data.frame(V1=colnames(rna_df), V2=t(rna_df))
 	} else if (tools::file_ext(newRNA) == "txt") {
 		rna_df <- read.table(newRNA, check.names=F, sep='\t')

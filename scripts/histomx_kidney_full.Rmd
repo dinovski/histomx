@@ -15,7 +15,7 @@ params:
 ---
 
 <style type="text/css">
-  body{font-size: 10pt;}
+  body{font-size: 12pt;}
 </style>
 
 ```{r, include=FALSE, eval=FALSE}
@@ -44,11 +44,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ***
 ## Molecular Pathology Platform
+> Inserm U970, 56 rue Leblanc 75015 Paris, France  
 > **Team leader:** Pr Alexandre Loupy MD/PhD  
 **Project managers:** Fariza Mezine & Dina Zielinski PhD  
-**Clinical reviewer:** Olivier Aubert MD/PhD    
-**Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85  
-> Inserm U970 - 56 rue Leblanc 75015 Paris, France
+**Contact:** jessy.dagobert@inserm.fr / +33-1-53-98-80-85
 
 ```{r, echo=FALSE, warning=FALSE, include=FALSE, eval=TRUE}
 source('../scripts/BHOTpred.R')
@@ -68,14 +67,13 @@ outPath=paste0(newPath, '/histomx_results/')
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
 ## the following functions output all files to a directory called 'histomx_results' in the input file path
-newPreds <- BHOTpred(newRCC, outPath, saveFiles=FALSE)
+newPreds <- BHOTpred(newRCC, out_path=outPath, save_files=TRUE, norm_method="separate", output_id="sample_id")
 newID <- newPreds$new_scores$ID
-
-newQC <- rccQC(newRCC, outPath)
 ```
 
 ***
 ## Sample info:
+<div style="margin-bottom:40px;">
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 ## check if sample info exists; check file type (json or txt) and import
@@ -85,29 +83,18 @@ if(!is.na(file.info(newPatient)$size)) {
 		jfile <- fromJSON(file=newPatient)
 		pt_df <- as.data.frame(jfile, check.names=F)
 	} else if (tools::file_ext(newPatient) == "txt") {
-		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"))
+		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"), encoding="UTF-8")
 	} else {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
-	
-	## if file contains no info, display empty data frame
-	if (empty(pt_df)==TRUE) {
-		
-		pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
-                        'Date of transplantation'=" ", 'Date of biopsy'=" ",
-                        'Biopsy indication'="    ", check.names=FALSE)
-		pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
-	} else {
-		## exclude empty cells
-		pt_df <- pt_df %>% filter_all(all_vars(!is.na(.)))
-	}
 
+	## exclude empty cells
+	pt_df <- pt_df %>% dplyr::filter_all(all_vars(!is.na(.)))
       
-} else {
+} else if (exists('pt_df')==FALSE) {
 	## if no file, display empty data frame
 	pt_df <- data.frame('Platform ID'=newPreds$new_scores$ID,
-                        'Date of transplantation'=" ", 'Date of biopsy'=" ",
-                        'Biopsy indication'="    ", check.names=FALSE)
+                        'Report date'=Sys.Date(), check.names=FALSE)
 	pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df)[,1])
 }
 
@@ -116,22 +103,21 @@ if(nrow(pt_df) %% 2 == 0) {
     pt_df <- cbind(pt_df[1:(nrow(pt_df)/2),], pt_df[(nrow(pt_df)/2+1):nrow(pt_df),])
     kable(pt_df, row.names=FALSE, col.names=rep("", ncol(pt_df)), align='c', format="html") %>%
           row_spec(1:nrow(pt_df), background="white") %>%
-          column_spec(c(1,3), bold=TRUE, background="whitesmoke")
+          column_spec(c(1,3), bold=TRUE, background="whitesmoke") %>% kable_styling()
 } else {
     ## todo: set 1st row as single row, remaining as double
     kable(pt_df, row.names=FALSE, col.names=rep("", ncol(pt_df)), align='c', format="html") %>%
     row_spec(1:nrow(pt_df), background="white") %>%
-    column_spec(1, bold=TRUE, background="whitesmoke")
+    column_spec(1, bold=TRUE, background="whitesmoke") %>% kable_styling()
 }
 
 ```
+</div>
 
 \newpage
 
 ***
-## Gene expression based probabilities
-***
-### Diagnosis based probabilities (%):
+## Gene expression based probabilities:
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 ## molecular score table
@@ -173,7 +159,7 @@ tab$'Diagnosis' <- rownames(tab)
 tab <- merge(tab, ci_new, by="Diagnosis")
 
 dx_tab <- merge(ms_new, tab[,c("Diagnosis", "CI", "Normal range")], by="Diagnosis")
-colnames(dx_tab)[colnames(dx_tab)=="CI"]<-paste(newID, "range")
+colnames(dx_tab)[colnames(dx_tab)=="CI"]<-"Sample range"
 
 dx_order <- c("amr", "tcmr", "normal")
 dx_tab <- dx_tab %>% dplyr::slice(match(dx_order, Diagnosis))
@@ -185,18 +171,20 @@ dx_tab <- dx_tab[!dx_tab$Diagnosis %in% "normal",] #exclude NONREJECTION score
 #TODO: scale probabilities relative to normal biopsies (eg. +/- SD)
 dx_tab$Interpretation <- ifelse(dx_tab[,newID]<=10,"unlikely",
                                        ifelse(dx_tab[,newID]>10 & dx_tab[,newID]<=20,"low probability",
-                                              ifelse(dx_tab[,newID]>20 & dx_tab[,newID]<=40,"moderate probability",
-                                                     ifelse(dx_tab[,newID]>40 & dx_tab[,newID]<=60,"moderate/high probability",
+                                              ifelse(dx_tab[,newID]>20 & dx_tab[,newID]<=40,"low/moderate probability",
+                                                     ifelse(dx_tab[,newID]>40 & dx_tab[,newID]<=60,"moderate probability",
                                                            ifelse(dx_tab[,newID]>60 & dx_tab[,newID]<=80,"high probability",
                                                                   ifelse(dx_tab[,newID]>80,"very high probability","NA"))))))
 
 kable(dx_tab, row.names=FALSE, align='c', caption="", format="html") %>%
     column_spec(1, bold=TRUE, color="black") %>%
     column_spec(c(2,3), bold=TRUE, color="dodgerblue") %>%
-    row_spec(1, background="whitesmoke") %>% row_spec(2, background="white")
+    row_spec(c(1,2), background="white")
 
 ```
-Diagnosis based scores represent the probability that a biopsy has an expression profile similar to reference samples with a given histology based diagnosis. Outcomes include AMR or TCMR rejection diagnosis. The sample range is the confidence interval for the predicted probability. The 'Normal range' is the middle 50% of scores in biopsies with no rejection or injury diagnosis.
+Diagnosis based scores represent the probability (0-100%) that a biopsy has an expression profile similar to reference samples with a given histology based rejection diagnosis (AMR or TCMR).  
+'Sample range' is the confidence interval for the predicted probabilities of the tested sample.  
+'Normal range' is the middle 50% of scores in biopsies with no rejection or injury diagnosis.
 
 ### Banff lesion based probabilities (%):
 ```{r, echo=FALSE, warning=FALSE, message=FALSE, include=TRUE, fig.align='center', fig.width=6, fig.height=5}
@@ -306,65 +294,30 @@ The above Banff lesion based scores represent the probability that a biopsy has 
 
 ***
 ## Principal Components Analysis (PCA) of molecular scores:
-<div style="margin-bottom:10px;">
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Samples are labeled by histologic diagnosis. The tested sample is the yellow diamond.'}
+<div style="margin-bottom:50px;">
+```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap=''}
 
 #gridExtra::grid.arrange(newPreds$pca_1_2, newPreds$pca_2_3, ncol=2)
 newPreds$pca_1_2
 #newPreds$pca_2_3
 
 ```
+Samples are labeled by histologic diagnosis (NRKI=non-rejection kidney injury). The tested sample is the yellow diamond.
 </div>
 
+\newpage
+
+***
 ### Histologic Diagnosis of 25 Nearest Neighbors
 ```{r, echo=FALSE, warning=FALSE, results='asis', eval=TRUE}
 newPreds$knn_dx$Dx <- rownames(newPreds$knn_dx)
 newPreds$knn_dx <- newPreds$knn_dx[,c("Dx", "Total", "Percent")]
+colnames(newPreds$knn_dx) <- c("Diagnosis", "Total", "Percent")
 
 kable(newPreds$knn_dx, row.names=FALSE, align='c', caption="", format="html") %>%
-    column_spec(c(1,2,3), bold=TRUE, background="white")
+    column_spec(1, bold=TRUE, background="white", color="black") %>%
+    column_spec(c(2,3), bold=TRUE, color="dodgerblue", background="white")
 ```
-
-```{r, echo=FALSE, warning=FALSE, results='asis', eval=FALSE}
-### Banff scores of 25 Nearest Neighbors (%)
-newPreds$knn_banff$score <- rownames(newPreds$knn_banff)
-newPreds$knn_banff <- newPreds$knn_banff[,c("score", "g", "ptc", "cg", "i", "t")]
-
-kable(newPreds$knn_banff, row.names=FALSE, align='c', caption="", format="html") %>%
-    column_spec(c(1,2,3,4,5,6), bold=TRUE, background="white")
-```
-
-\newpage
-
-***
-### Pathway analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed pathway (numbered dots indicate the absolute # of enriched genes; the heatmap indciates the % of genes associated with the given pathway).'}
-
-#gridExtra::grid.arrange(newPreds$cell_type_radar, newPreds$pathway_radar, ncol=2, nrow=1)
-
-newPreds$pathway_radar
-
-# pw_df <- newPreds$pathways
-# pw_df <- cbind(pw_df[1:(nrow(pw_df)/2),], pw_df[(nrow(pw_df)/2+1):nrow(pw_df),])
-# kable(pw_df, row.names=FALSE, col.names=rep("", ncol(pw_df)), align='c', format="html") %>%
-#           row_spec(1:nrow(pw_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-```
-
-***
-### Cell type analysis
-```{r, echo=FALSE, warning=FALSE, comment=FALSE, results='asis', fig.align='center', fig.cap='Genes with increased expression in the tested biopsy compared to all normal biopsies associated with the listed cell type.'}
-
-newPreds$cell_type_radar
-
-# ct_df <- newPreds$cell_types
-# ct_df <- cbind(ct_df[1:(nrow(ct_df)/2),], ct_df[(nrow(ct_df)/2+1):nrow(ct_df),])
-# kable(ct_df, row.names=FALSE, col.names=rep("", ncol(ct_df)), align='c', format="html") %>%
-#           row_spec(1:nrow(ct_df), background="white") %>%column_spec(c(1,3), bold=TRUE, background="whitesmoke")
-
-```
-
-\newpage
 
 ***
 ### Clinician signout
@@ -377,6 +330,8 @@ kable(sign_df, align='c', format="html") %>% kableExtra::kable_styling(position=
 > **_Comments:_**  
 >  &nbsp;    
 >  &nbsp;  
+>  &nbsp;  
+>  &nbsp;    
 >  &nbsp;  
 >  &nbsp;    
 >  &nbsp;  
@@ -394,13 +349,21 @@ if(!is.na(file.info(newRNA)$size)) {
   
   	if (tools::file_ext(newRNA) == "json") {
 		jfile <- fromJSON(file=newRNA)
-		rna_df <- as.data.frame(jfile, check.names=F)
+		jfile <- jsonlite:::null_to_na(jfile) # convert NULL to NA
+		rna_df <- as.data.frame(jfile, check.names=F, fix.empty.names=F)
+		rna_df <- data.frame(V1=colnames(rna_df), V2=t(rna_df))
 	} else if (tools::file_ext(newRNA) == "txt") {
 		rna_df <- read.table(newRNA, check.names=F, sep='\t')
 	} else {
 		stop("Sample info file must be a .json or tab delimited .txt file")
 	}	
 
+	## auto-fill units if missing
+	if(!c("units") %in% rna_df[,1]) {
+		cat("Adding a column for units (ng/ul)")
+		rna_df <- rbind(rna_df, data.frame(V1="units", V2="ng/ul"))
+	}
+			
 	## transpose and use first column as header
 	if(nrow(rna_df) > 2) {
 		rna_df <- setNames(data.frame(t(rna_df[,-1])), rna_df[,1])
@@ -437,8 +400,8 @@ if(!is.na(file.info(newRNA)$size)) {
   
 } else {
 	## display empty data frame
-	rna_df <- data.frame(ID=newPreds$new_scores$ID, '260/280 ratio'="", '260/230 ratio'="",
-                       concentration="", status="", check.names=FALSE)
+	rna_df <- data.frame(ID=newPreds$new_scores$ID, '260/280 ratio'="NA", '260/230 ratio'="NA",
+                       concentration="NA", status="NA", check.names=FALSE)
   
 	kable(rna_df, row.names=FALSE, align='c', caption="", format="html") %>%
 	column_spec(1, bold=TRUE, color="dodgerblue") %>%
@@ -452,37 +415,31 @@ if(!is.na(file.info(newRNA)$size)) {
 
 ### NanoString run information
 ```{r, echo=FALSE, warning=FALSE, include=TRUE}
-newQC$qc_table$variable <- rownames(newQC$qc_table)
-#newQC$qc_table <- newQC$qc_table[!rownames(newQC$qc_table) %in% "POS_E counts",]
 
-qcTab <- newQC$qc_table
-colnames(qcTab) <- c(newID, "variable")
-qcTab <- qcTab[!qcTab$variable %in% c("FovCount", "FovCounted", "ncgMean", "ncgSD", "FileVersion"),]
+qcTab <- newPreds$qc_table
+qcTab <- qcTab[!qcTab$variable %in% c("FovCount", "FovCounted", "ncgMean", "ncgSD", "FileVersion", "SoftwareVersion"),]
+qcTab <- qcTab %>% dplyr::select(variable, everything())
 
 qcTab <- cbind(qcTab[1:(nrow(qcTab)/2),], qcTab[(nrow(qcTab)/2+1):nrow(qcTab),])
 
 kable(qcTab, row.names=FALSE, col.names=rep("", ncol(qcTab)), align='l', caption="", format="html") %>%
   column_spec(c(1,3), bold=TRUE, background="whitesmoke") %>%
-  column_spec(c(2,4), background="white")
+  column_spec(c(2,4), background="white") %>% kable_styling()
 
-#The version of the RLF file must match the version of the CodeSet used in the hybridization
-#counts of POS_E should be higher than 2x the SD above the mean of the negative control
+#The lower the LOD the lower the expected level of background noise in the data
 #https://www.nanostring.com/wp-content/uploads/2020/12/Gene_Expression_Data_Analysis_Guidelines.pdf
 ```
-FoV=fields of view; geo mean=geometric mean; LoD=limit of detection; PCL=positive control linearity
+__FoV__=fields of view | __geoMean__=geometric mean | __PCL__=positive control linearity |
+__LoD__=limit of detection | __BD__=binding density | __SNratio__=geoMean of HK genes:LoD
 
-__Recommended thresholds:__  
-FoV >75%  
-Binding density 0.05 to 2.25  
-PCL > 0.95  
-80% ENDO genes > LoD  
-POS_E counts should be > LoD
+__Recommended QC thresholds:__    
+Registered FoVs>75% | PCL>0.95 | BD 0.05-2.25 | 50% ENDO genes>LoD | POS_E counts>LoD | SNratio>1 | HK genes below LoD=0  
+*Samples failing multiple QC flags and/or with >0 HK genes below LoD should be rerun.* 
 
-### For research use only
-Models have not been validated in clinical settings or trials. This report does not replace a standard diagnosis. Due to known technical variation, RNA later-fixed samples should be interpreted with caution.
+### For research use only:
+Models have been not been validated in clinical settings or trials. This report does not replace a standard diagnosis. Due to known technical variation, RNA later-fixed samples should be interpreted with caution.
 
 ```{r, echo=FALSE, include=TRUE}
-#logoIMG='../static/multi-logos.png'
 logoIMG='../static/ptg-logo.png'
 
 htmltools::img(src = knitr::image_uri(logoIMG), 
