@@ -21,6 +21,7 @@ params:
 ```{r, include=FALSE, eval=FALSE}
 ## to run manually
 newRCC='../test_files/test.RCC'
+newPatient='../test_files/patient-test.json'
 rmarkdown::render('../scripts/histomx_kidney.Rmd')
 ## convert output html to paged PDF 
 system('wkhtmltopdf --javascript-delay 1 ~/Desktop/histomx_report.html ~/Desktop/histomx_report.pdf')
@@ -83,6 +84,7 @@ if(!is.na(file.info(newPatient)$size)) {
 		jfile <- fromJSON(file=newPatient)
 		jfile <- jsonlite:::null_to_na(jfile) # convert NULL to NA
 		pt_df <- as.data.frame(jfile, check.names=F, fix.empty.names=F)
+		pt_df <- data.frame(V1=rownames(t(pt_df)), V2=t(pt_df), check.names=F)
 	} else if (tools::file_ext(newPatient) == "txt") {
 		pt_df <- read.table(newPatient, sep='\t', na.strings=c("", "NA"), encoding="UTF-8")
 	} else {
