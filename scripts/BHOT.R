@@ -1,14 +1,14 @@
 ## THIS IS THE MASTER SCRIPT
 
 ## Load dependencies
-library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "ggplot2", "ggpubr", "ggrepel", "knitr", "MASS", "ModelMetrics", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "rjson", "NormqPCR", "smotefamily", "stringr")
-missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
+library_list <- c("archetypes", "cowplot", "DESeq2", "dplyr", "FactoMineR", "ggplot2", "ggpubr", "ggrepel", "glmnet", "knitr", "MASS", "ModelMetrics", "MLeval", "nnet", "ordinal", "plyr", "predtools", "pROC", "RUVSeq", "RCRnorm", "rjson", "NormqPCR", "smotefamily", "stringr")
 
-#BiocManager::install("RUVSeq")
+missing_libraries <- library_list[!(library_list %in% installed.packages()[,"Package"])]
 
 if(length(missing_libraries) > 0) {
 	cat("The following libraries are missing:\n", missing_libraries)
 }
+#for (i in 1:length(missing_libraries)) { BiocManager::install(missing_libraries[i]) }
 
 ## Load all packages
 lapply(library_list, library, quietly=TRUE, character.only=TRUE)

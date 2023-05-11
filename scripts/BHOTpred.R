@@ -21,21 +21,18 @@ amr.glm.model <- get(load(paste0(modelPath, '/amr_models/amr_model_glm.rda')))
 amr.glmnet.model <- get(load(paste0(modelPath, '/amr_models/amr_model_glmnet.rda')))
 amr.lda.model <- get(load(paste0(modelPath, '/amr_models/amr_model_lda.rda')))
 amr.svmlinear.model <- get(load(paste0(modelPath, '/amr_models/amr_model_svmlinear.rda')))
-amr.svmradial.model <- get(load(paste0(modelPath, '/amr_models/amr_model_svmradial.rda')))
 
 ## tcmr base models
 tcmr.glm.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_glm.rda')))
 tcmr.glmnet.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_glmnet.rda')))
 tcmr.lda.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_lda.rda')))
 tcmr.svmlinear.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_svmlinear.rda')))
-tcmr.svmradial.model <- get(load(paste0(modelPath, '/tcmr_models/tcmr_model_svmradial.rda')))
 
 ## non-rejection base models
 normal.glm.model <- get(load(paste0(modelPath, '/normal_models/normal_model_glm.rda')))
 normal.glmnet.model <- get(load(paste0(modelPath, '/normal_models/normal_model_glmnet.rda')))
 normal.lda.model <- get(load(paste0(modelPath, '/normal_models/normal_model_lda.rda')))
 normal.svmlinear.model <- get(load(paste0(modelPath, '/normal_models/normal_model_svmlinear.rda')))
-normal.svmradial.model <- get(load(paste0(modelPath, '/normal_models/normal_model_svmradial.rda')))
 
 ##----------
 ## banff lesions
@@ -694,15 +691,13 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     amr.glmnet.preds <- predict(amr.glmnet.model, newdata = new.ge, type='prob')
     amr.lda.preds <- predict(amr.lda.model, newdata = new.ge, type='prob')
     amr.svmlinear.preds <- predict(amr.svmlinear.model, newdata = new.ge, type='prob')
-    amr.svmradial.preds <- predict(amr.svmradial.model, newdata = new.ge, type='prob')
 
     colnames(amr.glm.preds) <- paste0(colnames(amr.glm.preds), ".glm")
     colnames(amr.glmnet.preds) <- paste0(colnames(amr.glmnet.preds), ".glmnet")
     colnames(amr.lda.preds) <- paste0(colnames(amr.lda.preds), ".lda")
     colnames(amr.svmlinear.preds) <- paste0(colnames(amr.svmlinear.preds), ".svmlinear")
-    colnames(amr.svmradial.preds) <- paste0(colnames(amr.svmradial.preds), ".svmradial")
-    
-    amr.all.preds <- cbind(amr.glm.preds, amr.glmnet.preds, amr.lda.preds, amr.svmlinear.preds, amr.svmradial.preds)
+
+    amr.all.preds <- cbind(amr.glm.preds, amr.glmnet.preds, amr.lda.preds, amr.svmlinear.preds)
     amr.all.preds <- amr.all.preds[,grep("amr", colnames(amr.all.preds))]
     
     ##--------------------------
@@ -720,15 +715,13 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     tcmr.glmnet.preds <- predict(tcmr.glmnet.model, newdata = new.ge, type='prob')
     tcmr.lda.preds <- predict(tcmr.lda.model, newdata = new.ge, type='prob')
     tcmr.svmlinear.preds <- predict(tcmr.svmlinear.model, newdata = new.ge, type='prob')
-    tcmr.svmradial.preds <- predict(tcmr.svmradial.model, newdata = new.ge, type='prob')
-    
+
     colnames(tcmr.glm.preds) <- paste0(colnames(tcmr.glm.preds), ".glm")
     colnames(tcmr.glmnet.preds) <- paste0(colnames(tcmr.glmnet.preds), ".glmnet")
     colnames(tcmr.lda.preds) <- paste0(colnames(tcmr.lda.preds), ".lda")
     colnames(tcmr.svmlinear.preds) <- paste0(colnames(tcmr.svmlinear.preds), ".svmlinear")
-    colnames(tcmr.svmradial.preds) <- paste0(colnames(tcmr.svmradial.preds), ".svmradial")
-   
-    tcmr.all.preds <- cbind(tcmr.glm.preds, tcmr.glmnet.preds, tcmr.lda.preds, tcmr.svmlinear.preds, tcmr.svmradial.preds)
+
+    tcmr.all.preds <- cbind(tcmr.glm.preds, tcmr.glmnet.preds, tcmr.lda.preds, tcmr.svmlinear.preds)
     tcmr.all.preds <- tcmr.all.preds[,grep("tcmr", colnames(tcmr.all.preds))]
     
     ##--------------------------
@@ -746,15 +739,13 @@ BHOTpred <- function(newRCC, out_path, save_files=FALSE, norm_method="separate",
     normal.glmnet.preds <- predict(normal.glmnet.model, newdata = new.ge, type='prob')
     normal.lda.preds <- predict(normal.lda.model, newdata = new.ge, type='prob')
     normal.svmlinear.preds <- predict(normal.svmlinear.model, newdata = new.ge, type='prob')
-    normal.svmradial.preds <- predict(normal.svmradial.model, newdata = new.ge, type='prob')
-    
+
     colnames(normal.glm.preds) <- paste0(colnames(normal.glm.preds), ".glm")
     colnames(normal.glmnet.preds) <- paste0(colnames(normal.glmnet.preds), ".glmnet")
     colnames(normal.lda.preds) <- paste0(colnames(normal.lda.preds), ".lda")
     colnames(normal.svmlinear.preds) <- paste0(colnames(normal.svmlinear.preds), ".svmlinear")
-    colnames(normal.svmradial.preds) <- paste0(colnames(normal.svmradial.preds), ".svmradial")
-    
-    normal.all.preds <- cbind(normal.glm.preds, normal.glmnet.preds, normal.lda.preds, normal.svmlinear.preds, normal.svmradial.preds)
+
+    normal.all.preds <- cbind(normal.glm.preds, normal.glmnet.preds, normal.lda.preds, normal.svmlinear.preds)
     normal.all.preds <- normal.all.preds[,grep("normal", colnames(normal.all.preds))]
     
     ##-----------
